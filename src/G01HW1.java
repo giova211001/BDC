@@ -122,9 +122,6 @@ public class G01HW1 {
 
 
 
-
-
-
         JavaPairRDD<Tuple2<Double, Double>, String> pairs;
         // Convert the input into pairs of the form (point, group)
 
