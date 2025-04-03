@@ -4,7 +4,10 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.mllib.linalg.Vectors;
+import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.rdd.RDD;
+import scala.Char;
 import scala.Tuple2;
 
 import java.io.IOException;
@@ -100,17 +103,17 @@ public class G01HW1 {
             textFile method -> transform the input file into an RDD of Strings, whose element correspond to the
             distinct lines of thr file
          */
-        JavaRDD<String> input = ctx.textFile(file_path).repartition(L).cache();
+        JavaRDD<String> U = ctx.textFile(file_path).repartition(L).cache();
 
         // Setting the GLOBAL VARIABLES
         long points, number_a, number_b;
-        points = input.count();
-        number_a = input.filter(line -> line.trim().endsWith("A")).count();
-        number_b = input.filter(line -> line.trim().endsWith("B")).count();
+        points = U.count(); //stampa N
+        number_a = U.filter(line -> line.trim().endsWith("A")).count(); //stampa NA
+        number_b = U.filter(line -> line.trim().endsWith("B")).count(); //stampa NB
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
 
         //Another version to count the A and the B
-        Map<String, Long> counts = input
+        Map<String, Long> counts = U
                 .map(line -> line.trim().substring(line.trim().length() - 1)) // Take last character
                 .filter(letter -> letter.equals("A") || letter.equals("B")) // Consider only "A" and "B" in the last char
                 .countByValue(); // Count the occurences
@@ -121,12 +124,32 @@ public class G01HW1 {
 
 
 
-        JavaPairRDD<Tuple2<Double, Double>, String> pairs;
-        // Convert the input into pairs of the form (point, group)
 
 
 
+    }
 
+
+    public static Vector findClosestCentroid(Vector point, Vector[] centroids)
+    {
+        Vector closest = centroids[0];
+        // variable to save the minimum distance between the point and the nearest centroid
+        double min_distance = Vectors.sqdist(point,closest);
+
+        //Scan all the centroids
+        for(Vector centroid: centroids)
+        {
+            //Compute the distance between the point and the actual centroid
+            double distance = Vectors.sqdist(point, centroid);
+
+            //Check if the distance calculate is less than min_distance
+            if(distance < min_distance)
+            {
+                min_distance = distance;
+                closest = centroid;
+            }
+        }
+        return closest;
 
     }
 }
