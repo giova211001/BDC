@@ -4,6 +4,8 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.mllib.clustering.KMeansModel;
+import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.rdd.RDD;
@@ -103,17 +105,17 @@ public class G01HW1 {
             textFile method -> transform the input file into an RDD of Strings, whose element correspond to the
             distinct lines of thr file
          */
-        JavaRDD<String> U = ctx.textFile(file_path).repartition(L).cache();
+        JavaRDD<String> raw_data = ctx.textFile(file_path).repartition(L).cache();
 
         // Setting the GLOBAL VARIABLES
         long points, number_a, number_b;
-        points = U.count(); //stampa N
-        number_a = U.filter(line -> line.trim().endsWith("A")).count(); //stampa NA
-        number_b = U.filter(line -> line.trim().endsWith("B")).count(); //stampa NB
+        points = raw_data.count(); //stampa N
+        number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); //stampa NA
+        number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); //stampa NB
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
 
         //Another version to count the A and the B
-        Map<String, Long> counts = U
+        Map<String, Long> counts = raw_data
                 .map(line -> line.trim().substring(line.trim().length() - 1)) // Take last character
                 .filter(letter -> letter.equals("A") || letter.equals("B")) // Consider only "A" and "B" in the last char
                 .countByValue(); // Count the occurences
@@ -122,7 +124,30 @@ public class G01HW1 {
         System.out.println("NA: " + counts.getOrDefault("A", 0L));
         System.out.println("NB: " + counts.getOrDefault("B", 0L));
 
+        //  MAP - PHASE
+        // Leggere il file e trasformarlo in Tuple2<Vector, Character>
+        JavaPairRDD<Vector, Character> U = ctx.textFile(file_path).mapToPair(line -> {
+            String[] parts = line.split(",");
+            double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // Coordinate
+            Vector point = Vectors.dense(values);
+            char label = parts[2].trim().charAt(0); // Etichetta A/B
+            return new Tuple2<>(point, label);
+        }).cache();
 
+        // Estract only vector so compute the k-centroids
+        JavaRDD<Vector> pointsRDD = U.keys();
+
+        //Apply the standard method for compute the KMean
+        KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M);
+
+        Vector[] centroids = model.clusterCenters();
+
+        //Stampa a schermo
+        System.out.println("Centroidi iniziali calcolati:");
+        for(Vector c: centroids)
+        {
+            System.out.println(c);
+        }
 
 
 
