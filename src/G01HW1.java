@@ -1,5 +1,3 @@
-import com.sun.istack.logging.Logger;
-import org.apache.log4j.Level;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -8,11 +6,11 @@ import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.rdd.RDD;
 import scala.Char;
 import scala.Tuple2;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -142,12 +140,39 @@ public class G01HW1 {
 
         Vector[] centroids = model.clusterCenters();
 
+        System.out.println("Delta(U,C):" + MRComputeStandardObjective(pointsRDD, centroids));
+
         //Stampa a schermo
-        System.out.println("Centroidi iniziali calcolati:");
-        for(Vector c: centroids)
-        {
-            System.out.println(c);
-        }
+
+
+        // Predire i cluster per ciascun punto
+        //JavaRDD<Integer> clusterIndices = model.predict(pointsRDD);
+        //clusterIndices.foreach(point -> System.out.println(point));
+
+        // Supponendo che 'pointsRDD' sia un JavaRDD<Vector> contenente i punti
+        // e che 'centroids' sia un array di Vector rappresentante i centroidi trovati con KMeans
+
+        JavaPairRDD<Vector, Integer> pointsWithClosestCentroid = pointsRDD.mapToPair(point -> {
+            Vector closest = findClosestCentroid(point, centroids);
+            int index = Arrays.asList(centroids).indexOf(closest);
+            return new Tuple2<>(point, index); // Restituisce la coppia (punto, centroide più vicino)
+        });
+
+        // Stampare i risultati
+        pointsWithClosestCentroid.foreach(tuple -> {
+            System.out.println("Punto: " + tuple._1() + " --> Centroide più vicino: " + tuple._2());
+        });
+
+        // Otteniamo un RDD contenente solo gli indici dei cluster
+        JavaRDD<Integer> clusterAssignments = pointsWithClosestCentroid.map(Tuple2::_2);
+
+        // Conta quanti punti appartengono a ciascun cluster
+        Map<Integer, Long> clusterCounts = clusterAssignments.countByValue();
+
+        // Stampiamo il conteggio dei punti per ogni cluster
+        clusterCounts.forEach((cluster, count) ->
+                System.out.println("Cluster " + cluster + ": " + count + " punti"));
+
 
 
 
@@ -157,9 +182,9 @@ public class G01HW1 {
 
     public static Vector findClosestCentroid(Vector point, Vector[] centroids)
     {
-        Vector closest = centroids[0];
+        Vector closest = null;
         // variable to save the minimum distance between the point and the nearest centroid
-        double min_distance = Vectors.sqdist(point,closest);
+        double min_distance = Double.MAX_VALUE;
 
         //Scan all the centroids
         for(Vector centroid: centroids)
@@ -176,6 +201,21 @@ public class G01HW1 {
         }
         return closest;
 
+    }
+
+    public static double MRComputeStandardObjective(JavaRDD<Vector> pointsRDD, Vector[] centroids) {
+        // Numero totale di punti
+        long numPoints = pointsRDD.count();
+
+        // Calcoliamo la somma delle distanze quadrate tra ogni punto e il centroide più vicino
+        double totalSquaredDistance = pointsRDD
+                .map(point -> Vectors.sqdist(point, findClosestCentroid(point, centroids))) // Calcola d(u, C)^2
+                .reduce(Double::sum); // Somma tutte le distanze
+
+
+
+        // Evitiamo divisione per zero nel caso di input vuoto
+        return (numPoints == 0) ? 0.0 : totalSquaredDistance / numPoints;
     }
 }
 
