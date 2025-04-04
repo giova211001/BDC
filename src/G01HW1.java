@@ -205,6 +205,18 @@ public class G01HW1 {
 
     }
 
+    /**
+     * Computes and prints, for each cluster, the number of points from each demographic group (A and B).
+     * For each centroid ci, the method prints:
+     * - its index and coordinates,
+     * - the number of points from group A assigned to ci,
+     * - the number of points from group B assigned to ci.
+     *
+     * @param all_points An RDD of pairs (point, group), where each point is represented as a Vector,
+     *                   and the group is a Character label ('A' or 'B').
+     * @param centroids An array of Vectors representing the final centroids computed by k-means.
+     *
+     */
 
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
@@ -254,6 +266,18 @@ public class G01HW1 {
         }
     }
 
+    /**
+     * Computes the standard k-means clustering objective function Δ(U, C),
+     * defined as the average squared Euclidean distance from each point in the dataset
+     * to its closest centroid. This function does not take demographic group information into account.
+     *
+     * @param all_points An RDD of pairs (point, group), where point is a Vector
+     *  *                and group is a Character ('A' or 'B').
+     * @param centroids An array of Vectors representing the set of cluster centroids computed by the
+     *                  function KMean.train().
+     * @return The value of Δ(U, C)
+     *
+     */
     public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
         //MAP PHASE
@@ -272,7 +296,8 @@ public class G01HW1 {
         long totalPoints = all_points.count();
         double sumDistance = totalDistances.map( t -> t._2).reduce((a,b) -> a + b);
         //return the value
-        return sumDistance / totalPoints;
+        double delta = sumDistance / totalPoints;
+        return delta;
     }
 
     public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
