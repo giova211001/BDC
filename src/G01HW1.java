@@ -140,8 +140,6 @@ public class G01HW1 {
 
         Vector[] centroids = model.clusterCenters();
 
-        System.out.println("Delta(U,C):" + MRComputeStandardObjective(pointsRDD, centroids));
-
         //Stampa a schermo
 
 
@@ -153,9 +151,8 @@ public class G01HW1 {
         // e che 'centroids' sia un array di Vector rappresentante i centroidi trovati con KMeans
 
         JavaPairRDD<Vector, Integer> pointsWithClosestCentroid = pointsRDD.mapToPair(point -> {
-            Vector closest = findClosestCentroid(point, centroids);
-            int index = Arrays.asList(centroids).indexOf(closest);
-            return new Tuple2<>(point, index); // Restituisce la coppia (punto, centroide più vicino)
+            int closest = findClosestCentroid(point, centroids);
+            return new Tuple2<>(point, closest); // Restituisce la coppia (punto, centroide più vicino)
         });
 
         // Stampare i risultati
@@ -173,49 +170,90 @@ public class G01HW1 {
         clusterCounts.forEach((cluster, count) ->
                 System.out.println("Cluster " + cluster + ": " + count + " punti"));
 
-
-
+        System.out.println("Provo la stampa del metodo");
+        MRPrintStatistics(U, centroids);
 
 
     }
 
 
-    public static Vector findClosestCentroid(Vector point, Vector[] centroids)
+    public static int findClosestCentroid(Vector point, Vector[] centroids)
     {
         Vector closest = null;
         // variable to save the minimum distance between the point and the nearest centroid
         double min_distance = Double.MAX_VALUE;
+        int closest_idx = -1;
 
         //Scan all the centroids
-        for(Vector centroid: centroids)
+        for(int i = 0; i < centroids.length; i++)
         {
             //Compute the distance between the point and the actual centroid
-            double distance = Vectors.sqdist(point, centroid);
+            double distance = Vectors.sqdist(point, centroids[i]);
 
             //Check if the distance calculate is less than min_distance
             if(distance < min_distance)
             {
                 min_distance = distance;
-                closest = centroid;
+                closest = centroids[i];
+                closest_idx = i;
+
             }
         }
-        return closest;
+        return closest_idx;
 
     }
 
-    public static double MRComputeStandardObjective(JavaRDD<Vector> pointsRDD, Vector[] centroids) {
-        // Numero totale di punti
-        long numPoints = pointsRDD.count();
 
-        // Calcoliamo la somma delle distanze quadrate tra ogni punto e il centroide più vicino
-        double totalSquaredDistance = pointsRDD
-                .map(point -> Vectors.sqdist(point, findClosestCentroid(point, centroids))) // Calcola d(u, C)^2
-                .reduce(Double::sum); // Somma tutte le distanze
+    public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
+    {
+        //Every element is a pair ((x1,x2,.....,xD), group)
+        //MAP PHASE
+        // Assign every point at the nearest centroid
+        JavaPairRDD<Integer, Character> assignment = all_points.mapToPair(p -> {
+            Vector point = p._1;
+            Character group = p._2;
+            int cluster_idx = findClosestCentroid(point, centroids);
+            return new Tuple2<>(cluster_idx, group);
+        });
 
+        //MAP PHASE
+        // Convert into (key, value = 1) to count NA and NB
+        JavaPairRDD<Tuple2<Integer, Character>, Integer> toCount = assignment.mapToPair( t -> {
+            return new Tuple2<>(t, 1);
+        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE
 
+        // Group and format the output
+        Map<Tuple2<Integer, Character>, Integer> localMap = toCount.collectAsMap();
+        // Crea una mappa per tenere traccia dei contatori NA e NB per ogni indice
+        int[] NA = new int[centroids.length];  // contatori per A
+        int[] NB = new int[centroids.length];  // contatori per B
 
-        // Evitiamo divisione per zero nel caso di input vuoto
-        return (numPoints == 0) ? 0.0 : totalSquaredDistance / numPoints;
+        for (Map.Entry<Tuple2<Integer, Character>, Integer> entry : localMap.entrySet()) {
+            Tuple2<Integer, Character> key = entry.getKey();
+            Integer value = entry.getValue();
+            // Assegna i contatori a NA o NB in base al carattere
+            if (key._2() == 'A') {
+                NA[key._1()] += value;
+            } else if (key._2() == 'B') {
+                NB[key._1()] += value;
+            }
+        }
+
+        //Print result in the correct form
+        for(int i = 0; i < centroids.length; i++)
+        {
+            Vector centroid = centroids[i];
+            double x = centroid.apply(0);
+            double y = centroid.apply(1);
+
+            // Stampa formattata come richiesto
+            System.out.printf("i = %d, center = (%.6f, %.6f), NA%d = %d, NB%d = %d%n",
+                    i, x, y, i, NA[i], i, NB[i]);
+        }
     }
+
+
+
 }
+
 
