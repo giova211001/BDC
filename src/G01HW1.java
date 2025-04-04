@@ -287,9 +287,12 @@ public class G01HW1 {
         });
 
         //REDUCE PHASE
+        //Shuffle
         JavaPairRDD<Tuple2<Integer, Character>, Double> totalByGroup = distanceGroup.reduceByKey((a,b) -> a + b);
+        //Divide the two groups
 
 
+        return 0;
     }
 
 
