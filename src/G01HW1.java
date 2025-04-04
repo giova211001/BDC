@@ -275,6 +275,23 @@ public class G01HW1 {
         return sumDistance / totalPoints;
     }
 
+    public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
+    {
+        //MAP PHASE
+        JavaPairRDD<Tuple2<Integer, Character>, Double> distanceGroup = all_points.mapToPair( p -> {
+            Vector point = p._1;
+            Character group = p._2;
+            int closest_idx_centroid = findClosestCentroid(point, centroids);
+            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+            return new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance);
+        });
+
+        //REDUCE PHASE
+        JavaPairRDD<Tuple2<Integer, Character>, Double> totalByGroup = distanceGroup.reduceByKey((a,b) -> a + b);
+
+
+    }
+
 
 
 }
