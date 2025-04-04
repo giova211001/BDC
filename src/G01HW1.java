@@ -6,6 +6,7 @@ import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
+import org.codehaus.janino.Java;
 import scala.Char;
 import scala.Tuple2;
 
@@ -170,7 +171,8 @@ public class G01HW1 {
         clusterCounts.forEach((cluster, count) ->
                 System.out.println("Cluster " + cluster + ": " + count + " punti"));
 
-        System.out.println("Provo la stampa del metodo");
+        double standard = MRComputeStandardObjective(U, centroids);
+        System.out.printf("Delta(U,C) = %.6f%n", standard);
         MRPrintStatistics(U, centroids);
 
 
@@ -250,6 +252,27 @@ public class G01HW1 {
             System.out.printf("i = %d, center = (%.6f, %.6f), NA%d = %d, NB%d = %d%n",
                     i, x, y, i, NA[i], i, NB[i]);
         }
+    }
+
+    public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
+    {
+        //MAP PHASE
+        //Compute the squared distances
+        JavaPairRDD<Integer, Double> distances = all_points.mapToPair( p -> {
+            Vector point = p._1;
+            int closest_idx_centroid = findClosestCentroid(point, centroids);
+            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+            return new Tuple2<>(closest_idx_centroid, minDistance);
+        });
+
+        //REDUCE PHASE
+        // Sum all the distances for every centroid
+        JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
+        // Compute the average
+        long totalPoints = all_points.count();
+        double sumDistance = totalDistances.map( t -> t._2).reduce((a,b) -> a + b);
+        //return the value
+        return sumDistance / totalPoints;
     }
 
 
