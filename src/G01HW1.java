@@ -173,6 +173,9 @@ public class G01HW1 {
 
         double standard = MRComputeStandardObjective(U, centroids);
         System.out.printf("Delta(U,C) = %.6f%n", standard);
+        double fair = MRComputeFairObjective(U, centroids);
+        System.out.printf("Phi(A,B,C) = %.6f%n", fair);
+
         MRPrintStatistics(U, centroids);
 
 
@@ -309,15 +312,30 @@ public class G01HW1 {
             int closest_idx_centroid = findClosestCentroid(point, centroids);
             double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
             return new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance);
-        });
+        }).reduceByKey((a,b) -> a + b); //REDUCE PHASE
 
-        //REDUCE PHASE
-        //Shuffle
-        JavaPairRDD<Tuple2<Integer, Character>, Double> totalByGroup = distanceGroup.reduceByKey((a,b) -> a + b);
-        //Divide the two groups
+        JavaPairRDD<Character, Double> distanceForGroup = distanceGroup.mapToPair( entry -> {
+            Tuple2<Integer, Character> key = entry._1;
+            double dist = entry._2;
 
+            // I have to map to obtain (char, sum of distances)
+            return new Tuple2<>(key._2, dist);
+        }).reduceByKey((a,b) -> a + b);
 
-        return 0;
+        long NA = all_points.filter(p -> p._2 == 'A').count();
+        long NB = all_points.filter(p -> p._2 == 'B').count();
+
+        // Converting RDD to a Map to access values directly
+        Map<Character, Double> groupDistancesMap = distanceForGroup.collectAsMap();
+        double totalA = groupDistancesMap.getOrDefault('A', 0.0);
+        double totalB = groupDistancesMap.getOrDefault('B', 0.0);
+
+        double fairObjectiveA = totalA / NA;
+        double fairObjectiveB = totalB / NB;
+
+        double phi = Math.max(fairObjectiveA, fairObjectiveB);
+
+        return phi;
     }
 
 
