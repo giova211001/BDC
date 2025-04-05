@@ -9,6 +9,7 @@ import org.apache.spark.mllib.linalg.Vector;
 import org.codehaus.janino.Java;
 import scala.Char;
 import scala.Tuple2;
+import java.util.Locale;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -68,6 +69,9 @@ import java.util.Map;
 public class G01HW1 {
     public static void main(String[] args) throws IOException {
 
+        //Set the location to Locale.US to have the output format with . insthead of ,
+        Locale.setDefault(Locale.US);
+
         /*Check the number of CMD LINE PARAMETERS in order to satisfy the following requirement of the homework
          -> Prints the command-line arguments and stores  𝐿,𝐾,𝑀 into suitable variables.
          INPUTS:
@@ -113,15 +117,6 @@ public class G01HW1 {
         number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); //stampa NB
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
 
-        //Another version to count the A and the B
-        Map<String, Long> counts = raw_data
-                .map(line -> line.trim().substring(line.trim().length() - 1)) // Take last character
-                .filter(letter -> letter.equals("A") || letter.equals("B")) // Consider only "A" and "B" in the last char
-                .countByValue(); // Count the occurences
-
-
-        System.out.println("NA: " + counts.getOrDefault("A", 0L));
-        System.out.println("NB: " + counts.getOrDefault("B", 0L));
 
         //  MAP - PHASE
         // Leggere il file e trasformarlo in Tuple2<Vector, Character>
@@ -141,7 +136,6 @@ public class G01HW1 {
 
         Vector[] centroids = model.clusterCenters();
 
-        //Stampa a schermo
 
 
         // Predire i cluster per ciascun punto
@@ -157,9 +151,9 @@ public class G01HW1 {
         });
 
         // Stampare i risultati
-        pointsWithClosestCentroid.foreach(tuple -> {
-            System.out.println("Punto: " + tuple._1() + " --> Centroide più vicino: " + tuple._2());
-        });
+        //pointsWithClosestCentroid.foreach(tuple -> {
+        //    System.out.println("Punto: " + tuple._1() + " --> Centroide più vicino: " + tuple._2());
+        //});
 
         // Otteniamo un RDD contenente solo gli indici dei cluster
         JavaRDD<Integer> clusterAssignments = pointsWithClosestCentroid.map(Tuple2::_2);
