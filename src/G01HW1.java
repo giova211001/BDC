@@ -69,19 +69,22 @@ import java.util.Map;
 public class G01HW1 {
     public static void main(String[] args) throws IOException {
 
-        //Set the location to Locale.US to have the output format with . insthead of ,
+        /*
+        Set the location to Locale.US to have the output format with "." insthead of ","
+        This ensures the output uses the period as decimal separator insthead of the comma
+        (for example, 0.00123 insthead of 0,00123)
+         */
         Locale.setDefault(Locale.US);
 
-        /*Check the number of CMD LINE PARAMETERS in order to satisfy the following requirement of the homework
-         -> Prints the command-line arguments and stores  𝐿,𝐾,𝑀 into suitable variables.
-         INPUTS:
-         1) path to the file storing the input points
-         2) L = number of partitions
-         3) K = number of desired clusters
-         4) M = number of iterations
 
-         */
-
+        /*
+        * Check the number of CMD LINE PARAMETERS to ensure the input meets the homework requirements:
+        * The program expects 4 arguments:
+         * 1) Path to the file storing the input points.
+        * 2) L = number of partitions.
+        * 3) K = number of desired clusters.
+        * 4) M = number of iterations.
+        */
         if(args.length != 4){
             throw new IllegalArgumentException("USAGE: file_path num_partitions num_cluster num_iterations");
         }
@@ -96,12 +99,12 @@ public class G01HW1 {
         System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
 
         /*
-            SPARK SETUP
+            SPARK SETUP : Initialize Spark context and configurations
          */
 
-        SparkConf conf = new SparkConf(true).setAppName("G01HW1");
-        JavaSparkContext ctx = new JavaSparkContext(conf);
-        ctx.setLogLevel("OFF");
+        SparkConf conf = new SparkConf(true).setAppName("G01HW1"); // Set the application name for Spark
+        JavaSparkContext ctx = new JavaSparkContext(conf); // Create the JavaSparkContext to interact with Spark
+        ctx.setLogLevel("OFF"); // Turn off Spark logging for cleaner output
 
         /*
             Store the input file into the RDD and subdivide into L partitions
