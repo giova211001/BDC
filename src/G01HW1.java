@@ -148,7 +148,7 @@ public class G01HW1 {
 
         MRPrintStatistics(U, centroids);
 
-
+        ctx.close();
     }
 
 
