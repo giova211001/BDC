@@ -96,7 +96,6 @@ public class G01HW1 {
         int K = Integer.parseInt(args[2]);
         int M = Integer.parseInt(args[3]);
 
-        System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
 
         /*
             SPARK SETUP : Initialize Spark context and configurations
@@ -111,6 +110,9 @@ public class G01HW1 {
             textFile method -> transform the input file into an RDD of Strings, whose element correspond to the
             distinct lines of thr file
          */
+
+        System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
+
         JavaRDD<String> raw_data = ctx.textFile(file_path).repartition(L).cache();
 
         // Setting the GLOBAL VARIABLES
@@ -125,7 +127,7 @@ public class G01HW1 {
         // Leggere il file e trasformarlo in Tuple2<Vector, Character>
         JavaPairRDD<Vector, Character> U = ctx.textFile(file_path).mapToPair(line -> {
             String[] parts = line.split(",");
-            double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // Coordinate
+            double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // Point
             Vector point = Vectors.dense(values);
             char label = parts[2].trim().charAt(0); // Etichetta A/B
             return new Tuple2<>(point, label);
@@ -138,35 +140,6 @@ public class G01HW1 {
         KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M);
 
         Vector[] centroids = model.clusterCenters();
-
-
-
-        // Predire i cluster per ciascun punto
-        //JavaRDD<Integer> clusterIndices = model.predict(pointsRDD);
-        //clusterIndices.foreach(point -> System.out.println(point));
-
-        // Supponendo che 'pointsRDD' sia un JavaRDD<Vector> contenente i punti
-        // e che 'centroids' sia un array di Vector rappresentante i centroidi trovati con KMeans
-
-        JavaPairRDD<Vector, Integer> pointsWithClosestCentroid = pointsRDD.mapToPair(point -> {
-            int closest = findClosestCentroid(point, centroids);
-            return new Tuple2<>(point, closest); // Restituisce la coppia (punto, centroide più vicino)
-        });
-
-        // Stampare i risultati
-        //pointsWithClosestCentroid.foreach(tuple -> {
-        //    System.out.println("Punto: " + tuple._1() + " --> Centroide più vicino: " + tuple._2());
-        //});
-
-        // Otteniamo un RDD contenente solo gli indici dei cluster
-        JavaRDD<Integer> clusterAssignments = pointsWithClosestCentroid.map(Tuple2::_2);
-
-        // Conta quanti punti appartengono a ciascun cluster
-        Map<Integer, Long> clusterCounts = clusterAssignments.countByValue();
-
-        // Stampiamo il conteggio dei punti per ogni cluster
-        clusterCounts.forEach((cluster, count) ->
-                System.out.println("Cluster " + cluster + ": " + count + " punti"));
 
         double standard = MRComputeStandardObjective(U, centroids);
         System.out.printf("Delta(U,C) = %.6f%n", standard);
