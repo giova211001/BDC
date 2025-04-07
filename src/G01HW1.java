@@ -6,8 +6,6 @@ import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
-import org.codehaus.janino.Java;
-import scala.Char;
 import scala.Tuple2;
 import java.util.Locale;
 
@@ -16,52 +14,9 @@ import java.util.Arrays;
 import java.util.Map;
 
 /**
- * Specifically, for the homework you must do the following tasks.
- *
- * 1) Write a method/function MRComputeStandardObjective that takes in input an RDD of (point,group) pairs (representing a set 𝑈=𝐴∪𝐵
- * ), and a set 𝐶
- *  of centroids, and returns the value of the objective function Δ(𝑈,𝐶)
- *  described above, thus ignoring the demopgraphic groups.
- *
- * 2) Write a method/function MRComputeFairObjective that takes in input an RDD of (point,group) pairs (representing points of a set 𝑈=𝐴∪𝐵
- * ), and a set 𝐶
- *  of centroids, and returns the value of the objective function Φ(𝐴,𝐵,𝐶)
- *  described above.
- *
- * 3) Write a method/function MRPrintStatistics that takes in input an RDD of (point,group) pairs (representing points of a set 𝑈=𝐴∪𝐵
- * ), and a set 𝐶
- *  of centroids, and computes and prints the triplets (𝑐𝑖,𝑁𝐴𝑖,𝑁𝐵𝑖)
- * , for 1≤𝑖≤𝐾=|𝐶|
- * , where 𝑐𝑖
- *  is the 𝑖
- * -th centroid in 𝐶
- * , and 𝑁𝐴𝑖,𝑁𝐵𝑖
- *  are the numbers of points of 𝐴
- *  and 𝐵
- * , respectively, in the cluster 𝑈𝑖
- *  centered in 𝑐𝑖
- * .
- *
- * 4) Write a program GxxHW1.java (for Java users) or GxxHW1.py (for Python users), where xx is your 2-digit group number (e.g., 04 or 25), which receives in input, as command-line arguments, a path to the file storing the input points, and 3 integers 𝐿,𝐾,𝑀
- * , and does the following:
- *
- * Prints the command-line arguments and stores  𝐿,𝐾,𝑀
- *  into suitable variables.
- * Reads the input points into an RDD of (point,group) pairs -called inputPoints-, subdivided into 𝐿
- *  partitions.
- * Prints the number 𝑁
- *  of points, the number 𝑁𝐴
- *  of points of group A, and the number 𝑁𝐵
- *  of points of group B (hence, 𝑁=𝑁𝐴+𝑁𝐵
- * ).
- * Computes a set 𝐶
- *  of 𝐾
- *  centroids by using the Spark implementation of the standard Lloyd's algorithm for the input points, disregarding the points' demographic groups, and using 𝑀
- *  as number of iterations.
- * Prints the values of the two objective functions Δ(𝑈,𝐶)
- *  and Φ(𝐴,𝐵,𝐶)
- * , computed by running  MRComputeStandardObjective and MRComputeFairObjective, respectively.
- * Runs MRPrintStatistics.
+
+
+
  */
 
 
@@ -70,9 +25,9 @@ public class G01HW1 {
     public static void main(String[] args) throws IOException {
 
         /*
-        Set the location to Locale.US to have the output format with "." insthead of ","
-        This ensures the output uses the period as decimal separator insthead of the comma
-        (for example, 0.00123 insthead of 0,00123)
+        Set the location to Locale.US to have the output format with "." instead of ","
+        This ensures the output uses the period as decimal separator instead of the comma
+        (for example, 0.00123 instead of 0,00123)
          */
         Locale.setDefault(Locale.US);
 
@@ -92,9 +47,9 @@ public class G01HW1 {
 
         // Store and print the COMMAND LINE ARGUMENT
         String file_path = args[0];
-        int L = Integer.parseInt(args[1]);
-        int K = Integer.parseInt(args[2]);
-        int M = Integer.parseInt(args[3]);
+        int L = Integer.parseInt(args[1]); // Number of partitions
+        int K = Integer.parseInt(args[2]); // Number of desired clusters
+        int M = Integer.parseInt(args[3]); // Number of iterations for KMeans
 
 
         /*
@@ -111,69 +66,80 @@ public class G01HW1 {
             distinct lines of thr file
          */
 
+        // Print the parameters
         System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
 
+        // Read the input file into an RDD and repartition it into L partitions
         JavaRDD<String> raw_data = ctx.textFile(file_path).repartition(L).cache();
 
-        // Setting the GLOBAL VARIABLES
+        // Global variables to store counts of points, points in group A, and points in group B
         long points, number_a, number_b;
-        points = raw_data.count(); //stampa N
-        number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); //stampa NA
-        number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); //stampa NB
+        points = raw_data.count(); // Total number of points
+        number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); // Count of points of group A
+        number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); // Count of points of group B
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
 
-
-        //  MAP - PHASE
-        // Leggere il file e trasformarlo in Tuple2<Vector, Character>
-        JavaPairRDD<Vector, Character> U = ctx.textFile(file_path).mapToPair(line -> {
+        // MAP PHASE: Transform the input data into a tuple of (point, group) pairs
+        JavaPairRDD<Vector, Character> U = raw_data.mapToPair(line -> {
             String[] parts = line.split(",");
-            double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // Point
-            Vector point = Vectors.dense(values);
-            char label = parts[2].trim().charAt(0); // Etichetta A/B
+            double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // // Extract point coordinates
+            Vector point = Vectors.dense(values); // Create Vector for the point with the dense() method
+            char label = parts[2].trim().charAt(0); // Extract the label ('A' or 'B')
             return new Tuple2<>(point, label);
-        }).cache();
+        }).cache(); // Cache the RDD for performance reasons
 
-        // Estract only vector so compute the k-centroids
+        // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
         JavaRDD<Vector> pointsRDD = U.keys();
 
-        //Apply the standard method for compute the KMean
-        KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M);
-
+        // Apply KMeans to compute the centroids (cluster centers)
+        KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M); // Train the KMeans model with K clusters and M iterations
         Vector[] centroids = model.clusterCenters();
 
+        // Compute the standard objective function (Delta)
         double standard = MRComputeStandardObjective(U, centroids);
         System.out.printf("Delta(U,C) = %.6f%n", standard);
+
+        // Compute the fair objective function (Phi)
         double fair = MRComputeFairObjective(U, centroids);
         System.out.printf("Phi(A,B,C) = %.6f%n", fair);
 
+        // Print the statistics (cluster assignments and counts of group A and B points)
         MRPrintStatistics(U, centroids);
 
+        // Close the Spark context
         ctx.close();
     }
 
-
+    /**
+     * Finds the closest centroid to a given point by computing the squared Euclidean distance.
+     *
+     * @param point The point whose closest centroid is to be found.
+     * @param centroids The array of centroids to which the point will be compared.
+     * @return The index of the closest centroid.
+     */
     public static int findClosestCentroid(Vector point, Vector[] centroids)
     {
-        Vector closest = null;
         // variable to save the minimum distance between the point and the nearest centroid
-        double min_distance = Double.MAX_VALUE;
-        int closest_idx = -1;
+        double min_distance = Double.MAX_VALUE; // Initialize minimum distance to a very large value
+        int closest_idx = -1; // Initialize the index of the closest centroid
 
-        //Scan all the centroids
+        // Iterate through all centroids to find the closest one
         for(int i = 0; i < centroids.length; i++)
         {
-            //Compute the distance between the point and the actual centroid
+            // Compute the squared Euclidean distance between the point and the current centroid
+            // with the method sqdist of class Vector
             double distance = Vectors.sqdist(point, centroids[i]);
 
             //Check if the distance calculate is less than min_distance
             if(distance < min_distance)
             {
                 min_distance = distance;
-                closest = centroids[i];
                 closest_idx = i;
 
             }
         }
+
+        // Return the index of the closest centroid
         return closest_idx;
 
     }
@@ -194,39 +160,37 @@ public class G01HW1 {
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
         //Every element is a pair ((x1,x2,.....,xD), group)
-        //MAP PHASE
-        // Assign every point at the nearest centroid
+        //MAP PHASE: Assign each point at the nearest centroid
         JavaPairRDD<Integer, Character> assignment = all_points.mapToPair(p -> {
             Vector point = p._1;
             Character group = p._2;
-            int cluster_idx = findClosestCentroid(point, centroids);
-            return new Tuple2<>(cluster_idx, group);
+            int cluster_idx = findClosestCentroid(point, centroids); // Find the closest centroid index
+            return new Tuple2<>(cluster_idx, group); // Return a tuple of (cluster index, group label)
         });
 
-        //MAP PHASE
-        // Convert into (key, value = 1) to count NA and NB
+        // MAP PHASE: Convert into (key, value = 1) to count the number of points for each group in each cluster
         JavaPairRDD<Tuple2<Integer, Character>, Integer> toCount = assignment.mapToPair( t -> {
-            return new Tuple2<>(t, 1);
-        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE
+            return new Tuple2<>(t, 1); // Return a tuple where the key is (cluster index, group) and the value is 1 (count)
+        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE: Sum the values to get the total count of points in each group per cluster
 
-        // Group and format the output
+        // Collect the results into a map
         Map<Tuple2<Integer, Character>, Integer> localMap = toCount.collectAsMap();
-        // Crea una mappa per tenere traccia dei contatori NA e NB per ogni indice
-        int[] NA = new int[centroids.length];  // contatori per A
-        int[] NB = new int[centroids.length];  // contatori per B
+        // Arrays to store the counts of group A and B points for each centroid
+        int[] NA = new int[centroids.length];  // Count of group A points for each cluster
+        int[] NB = new int[centroids.length];  // Count of group B points for each cluster
 
         for (Map.Entry<Tuple2<Integer, Character>, Integer> entry : localMap.entrySet()) {
             Tuple2<Integer, Character> key = entry.getKey();
             Integer value = entry.getValue();
-            // Assegna i contatori a NA o NB in base al carattere
+            // Update the count of points for group A or B based on the group label
             if (key._2() == 'A') {
-                NA[key._1()] += value;
+                NA[key._1()] += value; // Increment group A count
             } else if (key._2() == 'B') {
-                NB[key._1()] += value;
+                NB[key._1()] += value; // Increment group B count
             }
         }
 
-        //Print result in the correct form
+        // Print the statistics (centroid index, centroid coordinates, group A count, and group B count for each cluster)
         for(int i = 0; i < centroids.length; i++)
         {
             Vector centroid = centroids[i];
@@ -253,35 +217,41 @@ public class G01HW1 {
      */
     public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
-        //MAP PHASE
-        //Compute the squared distances
+        // MAP PHASE: Compute the squared distance from each point to its closest centroid
         JavaPairRDD<Integer, Double> distances = all_points.mapToPair( p -> {
             Vector point = p._1;
-            int closest_idx_centroid = findClosestCentroid(point, centroids);
-            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
-            return new Tuple2<>(closest_idx_centroid, minDistance);
+            int closest_idx_centroid = findClosestCentroid(point, centroids); // Find the closest centroid index
+            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]); // Compute squared distance
+            return new Tuple2<>(closest_idx_centroid, minDistance); // Return a tuple of (centroid index, squared distance)
         });
 
-        //REDUCE PHASE
-        // Sum all the distances for every centroid
+        // REDUCE PHASE: Sum the squared distances for each centroid
         JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
-        // Compute the average
+        // Compute the total distance and the average distance
         long totalPoints = all_points.count();
         double sumDistance = totalDistances.map( t -> t._2).reduce((a,b) -> a + b);
-        //return the value
+        // Return the average squared distance (Delta)
         double delta = sumDistance / totalPoints;
         return delta;
     }
 
+    /**
+     * Computes the fair objective function (Phi) that ensures fairness between the two demographic groups,
+     * considering the distance from each group to their closest centroid.
+     *
+     * @param all_points An RDD of pairs (point, group), where point is a Vector and group is a Character ('A' or 'B').
+     * @param centroids An array of Vectors representing the centroids of the clusters.
+     * @return The value of the fair objective function Φ(A, B, C).
+     */
     public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
-        //MAP PHASE
+        // MAP PHASE: Compute the squared distance from each point to its closest centroid and its group
         JavaPairRDD<Tuple2<Integer, Character>, Double> distanceGroup = all_points.mapToPair( p -> {
             Vector point = p._1;
             Character group = p._2;
-            int closest_idx_centroid = findClosestCentroid(point, centroids);
-            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
-            return new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance);
+            int closest_idx_centroid = findClosestCentroid(point, centroids); // Find the closest centroid index
+            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]); // Compute squared distance
+            return new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance); // Return a tuple ((centroid index, group), minDistance)
         }).reduceByKey((a,b) -> a + b); //REDUCE PHASE
 
         JavaPairRDD<Character, Double> distanceForGroup = distanceGroup.mapToPair( entry -> {
