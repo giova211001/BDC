@@ -7,11 +7,10 @@ import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
 import scala.Tuple2;
-import java.util.Locale;
+
+import java.util.*;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
 
 /**
 
@@ -203,6 +202,7 @@ public class G01HW1 {
         }
     }
 
+
     /**
      * Computes the standard k-means clustering objective function Δ(U, C),
      * defined as the average squared Euclidean distance from each point in the dataset
@@ -217,19 +217,25 @@ public class G01HW1 {
      */
     public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
-        // MAP PHASE: Compute the squared distance from each point to its closest centroid
-        JavaPairRDD<Integer, Double> distances = all_points.mapToPair( p -> {
-            Vector point = p._1;
-            int closest_idx_centroid = findClosestCentroid(point, centroids); // Find the closest centroid index
-            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]); // Compute squared distance
-            return new Tuple2<>(closest_idx_centroid, minDistance); // Return a tuple of (centroid index, squared distance)
-        });
 
-        // REDUCE PHASE: Sum the squared distances for each centroid
-        JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
+        // MAP PHASE (per partizione): Calcola la distanza al quadrato di ogni punto dal centroide più vicino
+        JavaPairRDD<Integer, Double> distances = all_points.mapPartitionsToPair(partition -> {
+            List<Tuple2<Integer, Double>> results = new ArrayList<>();
+            while (partition.hasNext()) {
+                Tuple2<Vector, Character> p = partition.next();
+                Vector point = p._1;
+                int closest_idx_centroid = findClosestCentroid(point, centroids);
+                double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+                results.add(new Tuple2<>(closest_idx_centroid, minDistance));
+            }
+            return results.iterator();
+        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE: Sum the squared distances for each centroid
+
+
+        //JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
         // Compute the total distance and the average distance
         long totalPoints = all_points.count();
-        double sumDistance = totalDistances.map( t -> t._2).reduce((a,b) -> a + b);
+        double sumDistance = distances.map( t -> t._2).reduce((a,b) -> a + b);
         // Return the average squared distance (Delta)
         double delta = sumDistance / totalPoints;
         return delta;
@@ -246,13 +252,18 @@ public class G01HW1 {
     public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
         // MAP PHASE: Compute the squared distance from each point to its closest centroid and its group
-        JavaPairRDD<Tuple2<Integer, Character>, Double> distanceGroup = all_points.mapToPair( p -> {
-            Vector point = p._1;
-            Character group = p._2;
-            int closest_idx_centroid = findClosestCentroid(point, centroids); // Find the closest centroid index
-            double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]); // Compute squared distance
-            return new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance); // Return a tuple ((centroid index, group), minDistance)
-        }).reduceByKey((a,b) -> a + b); //REDUCE PHASE
+        JavaPairRDD<Tuple2<Integer, Character>, Double> distanceGroup = all_points.mapPartitionsToPair(partition -> {
+            List<Tuple2<Tuple2<Integer, Character>, Double>> results = new ArrayList<>();
+            while (partition.hasNext()) {
+                Tuple2<Vector, Character> p = partition.next();
+                Vector point = p._1;
+                Character group = p._2;
+                int closest_idx_centroid = findClosestCentroid(point, centroids);
+                double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+                results.add(new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance));
+            }
+            return results.iterator();
+        }).reduceByKey((a, b) -> a + b);
 
         JavaPairRDD<Character, Double> distanceForGroup = distanceGroup.mapToPair( entry -> {
             Tuple2<Integer, Character> key = entry._1;
