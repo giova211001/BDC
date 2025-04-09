@@ -1,16 +1,22 @@
+import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
+import org.codehaus.janino.Java;
+import scala.Char;
+import scala.Int;
 import scala.Tuple2;
 
 import java.util.*;
 
 import java.io.IOException;
+
 
 /**
 
@@ -21,6 +27,7 @@ import java.io.IOException;
 
 
 public class G01HW1 {
+
     public static void main(String[] args) throws IOException {
 
         /*
@@ -77,6 +84,7 @@ public class G01HW1 {
         number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); // Count of points of group A
         number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); // Count of points of group B
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
+
 
         // MAP PHASE: Transform the input data into a tuple of (point, group) pairs
         JavaPairRDD<Vector, Character> U = raw_data.mapToPair(line -> {
@@ -158,49 +166,39 @@ public class G01HW1 {
 
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
-        //Every element is a pair ((x1,x2,.....,xD), group)
-        //MAP PHASE: Assign each point at the nearest centroid
-        JavaPairRDD<Integer, Character> assignment = all_points.mapToPair(p -> {
+
+
+        JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapToPair(p -> {
             Vector point = p._1;
-            Character group = p._2;
-            int cluster_idx = findClosestCentroid(point, centroids); // Find the closest centroid index
-            return new Tuple2<>(cluster_idx, group); // Return a tuple of (cluster index, group label)
-        });
+            Character lab = p._2;
 
-        // MAP PHASE: Convert into (key, value = 1) to count the number of points for each group in each cluster
-        JavaPairRDD<Tuple2<Integer, Character>, Integer> toCount = assignment.mapToPair( t -> {
-            return new Tuple2<>(t, 1); // Return a tuple where the key is (cluster index, group) and the value is 1 (count)
-        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE: Sum the values to get the total count of points in each group per cluster
+            int centroid = findClosestCentroid(point, centroids);
+            if(lab == 'A') return new Tuple2<>(centroid, new Tuple2<>(1,0));
+            else return new Tuple2<>(centroid, new Tuple2<>(0,1));
+        }).reduceByKey((a,b) -> {
+            int localA = a._1 + b._1;
+            int localB = a._2 + b._2;
 
-        // Collect the results into a map
-        Map<Tuple2<Integer, Character>, Integer> localMap = toCount.collectAsMap();
-        // Arrays to store the counts of group A and B points for each centroid
-        int[] NA = new int[centroids.length];  // Count of group A points for each cluster
-        int[] NB = new int[centroids.length];  // Count of group B points for each cluster
+            return new Tuple2<>(localA, localB);
+        }).sortByKey();
 
-        for (Map.Entry<Tuple2<Integer, Character>, Integer> entry : localMap.entrySet()) {
-            Tuple2<Integer, Character> key = entry.getKey();
-            Integer value = entry.getValue();
-            // Update the count of points for group A or B based on the group label
-            if (key._2() == 'A') {
-                NA[key._1()] += value; // Increment group A count
-            } else if (key._2() == 'B') {
-                NB[key._1()] += value; // Increment group B count
-            }
-        }
+        List<Tuple2<Integer, Tuple2<Integer, Integer>>> result = points.collect();
 
-        // Print the statistics (centroid index, centroid coordinates, group A count, and group B count for each cluster)
-        for(int i = 0; i < centroids.length; i++)
-        {
-            Vector centroid = centroids[i];
-            double x = centroid.apply(0);
-            double y = centroid.apply(1);
+        for (Tuple2<Integer, Tuple2<Integer, Integer>> entry : result) {
+            int centroidId = entry._1;
+            int countA = entry._2._1;
+            int countB = entry._2._2;
+
+
 
             // Stampa formattata come richiesto
             System.out.printf("i = %d, center = (%.6f, %.6f), NA%d = %d, NB%d = %d%n",
-                    i, x, y, i, NA[i], i, NB[i]);
+                    centroidId, centroids[centroidId].apply(0), centroids[centroidId].apply(1), centroidId, countA, centroidId, countB);
         }
+
+
     }
+
 
 
     /**
@@ -289,8 +287,11 @@ public class G01HW1 {
         return phi;
     }
 
-
-
 }
+
+
+
+
+
 
 
