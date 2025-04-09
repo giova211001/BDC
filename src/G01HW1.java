@@ -1,16 +1,11 @@
-import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
-import org.codehaus.janino.Java;
-import scala.Char;
-import scala.Int;
 import scala.Tuple2;
 
 import java.util.*;
@@ -19,11 +14,25 @@ import java.io.IOException;
 
 
 /**
-
-
-
+ *
+ * This program performs clustering on a 2D dataset using the KMeans algorithm implemented in Apache Spark.
+ * In addition to the standard k-means objective function, it computes a fairness-aware clustering metric
+ * that accounts for demographic parity between two groups labeled 'A' and 'B'.
+ *
+ * The input consists of 2D points with a demographic label. The algorithm processes this input,
+ * clusters the data into K groups using L partitions over M iterations, and computes:
+ * - The standard k-means cost (Delta) --> function MRComputeStandardObjective
+ * - The fairness k-means cost (Phi) --> function MRComputeFairObjective
+ * - Statistics of group distribution across clusters --> function MRPrintStatistics
+ *
+ * Input Format (CSV): x, y, label (where label is either 'A' or 'B')
+ *
+ *
+ * Dependencies: Apache Spark, Spark MLlib
+ *
+ * Author: Faedo Giovanni, Prioli Giacomo, Francescato Daniele
+ * Date: [Your Date]
  */
-
 
 
 public class G01HW1 {
@@ -69,12 +78,8 @@ public class G01HW1 {
         /*
             Store the input file into the RDD and subdivide into L partitions
             textFile method -> transform the input file into an RDD of Strings, whose element correspond to the
-            distinct lines of thr file
+            distinct lines of the file
          */
-
-        // Print the parameters
-        System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
-
         // Read the input file into an RDD and repartition it into L partitions
         JavaRDD<String> raw_data = ctx.textFile(file_path).repartition(L).cache();
 
@@ -83,10 +88,14 @@ public class G01HW1 {
         points = raw_data.count(); // Total number of points
         number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); // Count of points of group A
         number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); // Count of points of group B
+
+        // Print input parameters and dataset statistic (total number of points, total number of points
+        // with label 'A' and total number of points with label 'B')
+        System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
         System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
 
 
-        // MAP PHASE: Transform the input data into a tuple of (point, group) pairs
+        // MAP PHASE: Transform the input data into a tuple of (Vector, Label) pairs
         JavaPairRDD<Vector, Character> U = raw_data.mapToPair(line -> {
             String[] parts = line.split(",");
             double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // // Extract point coordinates
@@ -151,18 +160,7 @@ public class G01HW1 {
 
     }
 
-    /**
-     * Computes and prints, for each cluster, the number of points from each demographic group (A and B).
-     * For each centroid ci, the method prints:
-     * - its index and coordinates,
-     * - the number of points from group A assigned to ci,
-     * - the number of points from group B assigned to ci.
-     *
-     * @param all_points An RDD of pairs (point, group), where each point is represented as a Vector,
-     *                   and the group is a Character label ('A' or 'B').
-     * @param centroids An array of Vectors representing the final centroids computed by k-means.
-     *
-     */
+
 
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
