@@ -167,14 +167,25 @@ public class G01HW1 {
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
 
+        JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapPartitionsToPair(iter -> {
 
-        JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapToPair(p -> {
-            Vector point = p._1;
-            Character lab = p._2;
+            List<Tuple2<Integer, Tuple2<Integer, Integer>>> results = new ArrayList<>();
+            while(iter.hasNext()){
+                Tuple2<Vector, Character> p = iter.next();
+                Vector point = p._1;
+                Character lab = p._2;
 
-            int centroid = findClosestCentroid(point, centroids);
-            if(lab == 'A') return new Tuple2<>(centroid, new Tuple2<>(1,0));
-            else return new Tuple2<>(centroid, new Tuple2<>(0,1));
+                int centroid = findClosestCentroid(point, centroids);
+
+
+                if (lab == 'A')
+                    results.add(new Tuple2<>(centroid, new Tuple2<>(1, 0)));
+                else
+                    results.add(new Tuple2<>(centroid, new Tuple2<>(0, 1)));
+            }
+
+            return results.iterator();
+
         }).reduceByKey((a,b) -> {
             int localA = a._1 + b._1;
             int localB = a._2 + b._2;
