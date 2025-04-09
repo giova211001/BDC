@@ -160,47 +160,64 @@ public class G01HW1 {
 
     }
 
-
-
+    /**
+     * Computes and prints statistics for each cluster formed by the KMeans algorithm.
+     *
+     * This method calculates, for each centroid, how many points of group A and group B
+     * have been assigned to it. The assignment is based on the closest centroid to each point
+     * using the squared Euclidean distance. The statistics are then printed in a formatted
+     * output for each cluster.
+     *
+     * @param all_points A JavaPairRDD where each element is a tuple containing a point (as a Vector)
+     *                   and its associated demographic group ('A' or 'B').
+     * @param centroids  An array of cluster centroids computed by the KMeans algorithm.
+     */
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
 
+        // MAP PHASE (with partitions)
         JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapPartitionsToPair(iter -> {
 
+            // Temporary list to collect output tuples from this partition
             List<Tuple2<Integer, Tuple2<Integer, Integer>>> results = new ArrayList<>();
+            // Iterate over all points in the partition
             while(iter.hasNext()){
                 Tuple2<Vector, Character> p = iter.next();
                 Vector point = p._1;
                 Character lab = p._2;
 
+                // Find the index of the closest centroid for the current point
                 int centroid = findClosestCentroid(point, centroids);
 
 
+                // Create a pair (centroid index, (1, 0)) if the point belongs to group A,
+                // or (centroid index, (0, 1)) if it belongs to group B
                 if (lab == 'A')
                     results.add(new Tuple2<>(centroid, new Tuple2<>(1, 0)));
                 else
                     results.add(new Tuple2<>(centroid, new Tuple2<>(0, 1)));
             }
 
+            // Return all results for this partition
             return results.iterator();
 
+            // REDUCE PHASE: Sum the counts of A and B for each centroid across all partitions
         }).reduceByKey((a,b) -> {
-            int localA = a._1 + b._1;
-            int localB = a._2 + b._2;
+            int localA = a._1 + b._1; // Sum of points with label A
+            int localB = a._2 + b._2; // Sum of points with label B
 
-            return new Tuple2<>(localA, localB);
+            return new Tuple2<>(localA, localB); // Return updated count pair
         }).sortByKey();
 
         List<Tuple2<Integer, Tuple2<Integer, Integer>>> result = points.collect();
 
+        // Print formatted output for each centroid
         for (Tuple2<Integer, Tuple2<Integer, Integer>> entry : result) {
             int centroidId = entry._1;
             int countA = entry._2._1;
             int countB = entry._2._2;
 
-
-
-            // Stampa formattata come richiesto
+            // Print centroid index, coordinates, and the number of A/B points assigned
             System.out.printf("i = %d, center = (%.6f, %.6f), NA%d = %d, NB%d = %d%n",
                     centroidId, centroids[centroidId].apply(0), centroids[centroidId].apply(1), centroidId, countA, centroidId, countB);
         }
@@ -236,13 +253,13 @@ public class G01HW1 {
                 results.add(new Tuple2<>(closest_idx_centroid, minDistance));
             }
             return results.iterator();
-        }).reduceByKey((a,b) -> a + b); // REDUCE PHASE: Sum the squared distances for each centroid
+        }).reduceByKey(Double::sum); // REDUCE PHASE: Sum the squared distances for each centroid
 
 
         //JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
         // Compute the total distance and the average distance
         long totalPoints = all_points.count();
-        double sumDistance = distances.map( t -> t._2).reduce((a,b) -> a + b);
+        double sumDistance = distances.map( t -> t._2).reduce(Double::sum);
         // Return the average squared distance (Delta)
         double delta = sumDistance / totalPoints;
         return delta;
