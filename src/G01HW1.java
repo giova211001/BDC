@@ -6,6 +6,7 @@ import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
+import scala.Char;
 import scala.Tuple2;
 
 import java.util.*;
@@ -273,37 +274,31 @@ public class G01HW1 {
      * @param centroids An array of Vectors representing the centroids of the clusters.
      * @return The value of the fair objective function Φ(A, B, C).
      */
-    public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
-    {
+    public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids) {
+
         // MAP PHASE: Compute the squared distance from each point to its closest centroid and its group
-        JavaPairRDD<Tuple2<Integer, Character>, Double> distanceGroup = all_points.mapPartitionsToPair(partition -> {
-            List<Tuple2<Tuple2<Integer, Character>, Double>> results = new ArrayList<>();
+        JavaPairRDD<Character, Double> mapped = all_points.mapPartitionsToPair(partition -> {
+
+            List<Tuple2<Character, Double>> results = new ArrayList<>();
             while (partition.hasNext()) {
                 Tuple2<Vector, Character> p = partition.next();
                 Vector point = p._1;
                 Character group = p._2;
                 int closest_idx_centroid = findClosestCentroid(point, centroids);
                 double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
-                results.add(new Tuple2<>(new Tuple2<>(closest_idx_centroid, group), minDistance));
+                results.add(new Tuple2<>(group, minDistance));
             }
             return results.iterator();
         }).reduceByKey((a, b) -> a + b);
 
-        JavaPairRDD<Character, Double> distanceForGroup = distanceGroup.mapToPair( entry -> {
-            Tuple2<Integer, Character> key = entry._1;
-            double dist = entry._2;
-
-            // I have to map to obtain (char, sum of distances)
-            return new Tuple2<>(key._2, dist);
-        }).reduceByKey((a,b) -> a + b);
-
         long NA = all_points.filter(p -> p._2 == 'A').count();
         long NB = all_points.filter(p -> p._2 == 'B').count();
 
-        // Converting RDD to a Map to access values directly
-        Map<Character, Double> groupDistancesMap = distanceForGroup.collectAsMap();
-        double totalA = groupDistancesMap.getOrDefault('A', 0.0);
-        double totalB = groupDistancesMap.getOrDefault('B', 0.0);
+        // Collect the results into a Map for printing
+        Map<Character, Double> result = mapped.collectAsMap();
+
+        double totalA = result.get('A');
+        double totalB = result.get('B');
 
         double fairObjectiveA = totalA / NA;
         double fairObjectiveB = totalB / NB;
@@ -311,6 +306,8 @@ public class G01HW1 {
         double phi = Math.max(fairObjectiveA, fairObjectiveB);
 
         return phi;
+
+
     }
 
 }
