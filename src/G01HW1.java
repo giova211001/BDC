@@ -188,15 +188,15 @@ public class G01HW1 {
                 Character lab = p._2;
 
                 // Find the index of the closest centroid for the current point
-                int centroid = findClosestCentroid(point, centroids);
+                int centroid_idx = findClosestCentroid(point, centroids);
 
 
                 // Create a pair (centroid index, (1, 0)) if the point belongs to group A,
                 // or (centroid index, (0, 1)) if it belongs to group B
                 if (lab == 'A')
-                    results.add(new Tuple2<>(centroid, new Tuple2<>(1, 0)));
+                    results.add(new Tuple2<>(centroid_idx, new Tuple2<>(1, 0)));
                 else
-                    results.add(new Tuple2<>(centroid, new Tuple2<>(0, 1)));
+                    results.add(new Tuple2<>(centroid_idx, new Tuple2<>(0, 1)));
             }
 
             // Return all results for this partition
@@ -223,9 +223,7 @@ public class G01HW1 {
                     centroidId, centroids[centroidId].apply(0), centroids[centroidId].apply(1), centroidId, countA, centroidId, countB);
         }
 
-
     }
-
 
 
     /**
