@@ -147,7 +147,7 @@ public class G01HW1 {
             // with the method sqdist of class Vector
             double distance = Vectors.sqdist(point, centroids[i]);
 
-            //Check if the distance calculate is less than min_distance
+            // Update closest centroid if a nearer one is found
             if(distance < min_distance)
             {
                 min_distance = distance;
@@ -366,6 +366,15 @@ public class G01HW1 {
         long NA = all_points.filter(p -> p._2 == 'A').count();
         long NB = all_points.filter(p -> p._2 == 'B').count();
 
+        /**
+         * Ensure neither group A nor B is empty to avoid division by zero
+         * @throws IllegalStateException if one group has no points, making fairness computation impossible.
+         */
+        if (NA == 0 || NB == 0) {
+            throw new IllegalStateException("Fairness cannot be computed: one group has no points. " +
+                    "NA = " + NA + ", NB = " + NB);
+        }
+
         // Collect the results into a Map for printing
         Map<Character, Double> result = mapped.collectAsMap();
 
@@ -373,6 +382,7 @@ public class G01HW1 {
          * Collect the reduced results into a local map:
          * result.get('A') → total squared distance for group A
          * result.get('B') → total squared distance for group B
+         * (default to 0.0 if a group is missing)
          */
         double totalA = result.getOrDefault('A', 0.0);
         double totalB = result.getOrDefault('B', 0.0);
