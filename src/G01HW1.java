@@ -245,8 +245,6 @@ public class G01HW1 {
                     centroidId, centroids[centroidId].apply(0), centroids[centroidId].apply(1), centroidId, countA, centroidId, countB);
         }
 
-
-
     }
 
 
