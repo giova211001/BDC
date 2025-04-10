@@ -326,33 +326,64 @@ public class G01HW1 {
      */
     public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids) {
 
-        // MAP PHASE: Compute the squared distance from each point to its closest centroid and its group
+        /*
+         * MAP PHASE (per partition):
+         * For each point in the dataset:
+         * - Compute the squared distance to its closest centroid.
+         * - Emit a pair (group label, squared distance).
+         * The result is a collection of (A, dist) and (B, dist) pairs.
+         */
         JavaPairRDD<Character, Double> mapped = all_points.mapPartitionsToPair(partition -> {
 
+            // Temporary list to hold intermediate (group, distance) pairs
             List<Tuple2<Character, Double>> results = new ArrayList<>();
+
+            // Iterate over each point in the partition
             while (partition.hasNext()) {
                 Tuple2<Vector, Character> p = partition.next();
                 Vector point = p._1;
                 Character group = p._2;
+
+                // Find the closest centroid and compute the squared distance
                 int closest_idx_centroid = findClosestCentroid(point, centroids);
                 double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+
+                // Add the result pair to the list
                 results.add(new Tuple2<>(group, minDistance));
             }
+            // Return iterator over the results
             return results.iterator();
-        }).reduceByKey((a, b) -> a + b);
+        })
 
+        /*
+        * REDUCE PHASE:
+        * Sum the squared distances for each group label ('A' and 'B').
+        * Resulting RDD: ('A', totalDistanceA), ('B', totalDistanceB)
+        */
+
+        .reduceByKey((a, b) -> a + b);
+
+
+        // Count the number of points in each group to compute averages
         long NA = all_points.filter(p -> p._2 == 'A').count();
         long NB = all_points.filter(p -> p._2 == 'B').count();
 
         // Collect the results into a Map for printing
         Map<Character, Double> result = mapped.collectAsMap();
 
-        double totalA = result.get('A');
-        double totalB = result.get('B');
+        /*
+         * Collect the reduced results into a local map:
+         * result.get('A') → total squared distance for group A
+         * result.get('B') → total squared distance for group B
+         */
+        double totalA = result.getOrDefault('A', 0.0);
+        double totalB = result.getOrDefault('B', 0.0);
 
+        // Compute the average squared distance for each group
         double fairObjectiveA = totalA / NA;
         double fairObjectiveB = totalB / NB;
 
+        // Return the maximum of the two group costs (phi value)
         double phi = Math.max(fairObjectiveA, fairObjectiveB);
 
         return phi;
