@@ -67,11 +67,29 @@ public class G01HW1 {
         int K = Integer.parseInt(args[2]); // Number of desired clusters
         int M = Integer.parseInt(args[3]); // Number of iterations for KMeans
 
-
-        /*
-            SPARK SETUP : Initialize Spark context and configurations
+        /**
+         * Validates that K (number of clusters) and M (number of iterations) are positive integers.
+         *
+         * K-means cannot execute with:
+         * - K ≤ 0 (at least 1 cluster is required)
+         * - M ≤ 0 (at least 1 iteration is needed to compute centroids)
+         *
+         * @throws IllegalArgumentException if K or M are non-positive
          */
 
+        if (K <= 0 || M <= 0) {
+            throw new IllegalArgumentException("K and M must be positive integers.");
+        }
+
+        /**
+         * Basic validation: file_path must be non-null and non-empty
+         * @throws IllegalArgumentException if K or M are non-positive
+         */
+        if (file_path == null || file_path.trim().isEmpty()) {
+            throw new IllegalArgumentException("File path cannot be null or empty.");
+        }
+
+        // SPARK SETUP : Initialize Spark context and configurations
         SparkConf conf = new SparkConf(true).setAppName("G01HW1"); // Set the application name for Spark
         JavaSparkContext ctx = new JavaSparkContext(conf); // Create the JavaSparkContext to interact with Spark
         ctx.setLogLevel("OFF"); // Turn off Spark logging for cleaner output
@@ -103,7 +121,7 @@ public class G01HW1 {
             Vector point = Vectors.dense(values); // Create Vector for the point with the dense() method
             char label = parts[2].trim().charAt(0); // Extract the label ('A' or 'B')
             return new Tuple2<>(point, label);
-        }).cache(); // Cache the RDD for performance reasons
+        }).cache(); // Cache the RDD for performance
 
         // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
         JavaRDD<Vector> pointsRDD = U.keys();
