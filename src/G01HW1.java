@@ -132,10 +132,15 @@ public class G01HW1 {
      *
      * @param point The point whose closest centroid is to be found.
      * @param centroids The array of centroids to which the point will be compared.
+     * @throws IllegalArgumentException if centroids array is empty.
      * @return The index of the closest centroid.
      */
     public static int findClosestCentroid(Vector point, Vector[] centroids)
     {
+        if(centroids.length == 0) {
+            throw new IllegalArgumentException("Centroids array cannot be empty.");
+        }
+
         // variable to save the minimum distance between the point and the nearest centroid
         double min_distance = Double.MAX_VALUE; // Initialize minimum distance to a very large value
         int closest_idx = -1; // Initialize the index of the closest centroid
@@ -172,9 +177,15 @@ public class G01HW1 {
      * @param all_points A JavaPairRDD where each element is a tuple containing a point (as a Vector)
      *                   and its associated demographic group ('A' or 'B').
      * @param centroids  An array of cluster centroids computed by the KMeans algorithm.
+     * @throws IllegalArgumentException if centroids array is empty.
      */
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
+
+        if(centroids.length == 0) {
+            throw new IllegalArgumentException("Centroids array cannot be empty.");
+        }
+
         /*
          * MAP PHASE (per partition):
          * For each point in the partition, find its closest centroid.
@@ -257,11 +268,16 @@ public class G01HW1 {
      *  *                and group is a Character ('A' or 'B').
      * @param centroids An array of Vectors representing the set of cluster centroids computed by the
      *                  function KMean.train().
+     * @throws IllegalArgumentException if centroids array is empty.
      * @return The value of Δ(U, C)
      *
      */
     public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
+
+        if(centroids.length == 0) {
+            throw new IllegalArgumentException("Centroids array cannot be empty.");
+        }
 
         /*
          * MAP PHASE (per partition):
@@ -320,9 +336,15 @@ public class G01HW1 {
      *
      * @param all_points An RDD of pairs (point, group), where point is a Vector and group is a Character ('A' or 'B').
      * @param centroids An array of Vectors representing the centroids of the clusters.
+     * @throws IllegalArgumentException if centroids array is empty.
+     * @throws IllegalStateException if one group has no points, making fairness computation impossible.
      * @return The value of the fair objective function Φ(A, B, C).
      */
     public static double MRComputeFairObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids) {
+
+        if(centroids.length == 0) {
+            throw new IllegalArgumentException("Centroids array cannot be empty.");
+        }
 
         /*
          * MAP PHASE (per partition):
@@ -366,10 +388,8 @@ public class G01HW1 {
         long NA = all_points.filter(p -> p._2 == 'A').count();
         long NB = all_points.filter(p -> p._2 == 'B').count();
 
-        /**
-         * Ensure neither group A nor B is empty to avoid division by zero
-         * @throws IllegalStateException if one group has no points, making fairness computation impossible.
-         */
+
+        // Ensure neither group A nor B is empty to avoid division by zero
         if (NA == 0 || NB == 0) {
             throw new IllegalStateException("Fairness cannot be computed: one group has no points. " +
                     "NA = " + NA + ", NB = " + NB);
