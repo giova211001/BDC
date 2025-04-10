@@ -186,6 +186,7 @@ public class G01HW1 {
 
             // Temporary list to collect output tuples from this partition
             List<Tuple2<Integer, Tuple2<Integer, Integer>>> results = new ArrayList<>();
+
             // Iterate over all points in the partition
             while(iter.hasNext()){
                 Tuple2<Vector, Character> p = iter.next();
@@ -207,8 +208,14 @@ public class G01HW1 {
             // Return all results for this partition
             return results.iterator();
 
-            // REDUCE PHASE: Sum the counts of A and B for each centroid across all partitions
+
         })
+
+        /*
+        * REDUCE PHASE:
+        * Sum the (countA, countB) tuples for each centroid index to obtain the total
+        * number of A and B points assigned to each cluster.
+        */
 
         .reduceByKey((a,b) -> {
             int localA = a._1 + b._1; // Sum of points with label A
@@ -217,6 +224,7 @@ public class G01HW1 {
             return new Tuple2<>(localA, localB); // Return updated count pair
         })
 
+        // Sort the results by centroid index (for clean output order)
         .sortByKey();
 
         /*
