@@ -175,8 +175,13 @@ public class G01HW1 {
      */
     public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
-
-        // MAP PHASE (with partitions)
+        /*
+         * MAP PHASE (per partition):
+         * For each point in the partition, find its closest centroid.
+         * Then emit a pair (centroid index, (1, 0)) if the point belongs to group A,
+         * or (centroid index, (0, 1)) if it belongs to group B.
+         * The resulting RDD has structure: (centroid index, (countA, countB))
+         */
         JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapPartitionsToPair(iter -> {
 
             // Temporary list to collect output tuples from this partition
@@ -203,12 +208,16 @@ public class G01HW1 {
             return results.iterator();
 
             // REDUCE PHASE: Sum the counts of A and B for each centroid across all partitions
-        }).reduceByKey((a,b) -> {
+        })
+
+        .reduceByKey((a,b) -> {
             int localA = a._1 + b._1; // Sum of points with label A
             int localB = a._2 + b._2; // Sum of points with label B
 
             return new Tuple2<>(localA, localB); // Return updated count pair
-        }).sortByKey();
+        })
+
+        .sortByKey();
 
         /*
          * Print formatted output for each centroid.
