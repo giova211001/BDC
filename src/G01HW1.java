@@ -6,7 +6,6 @@ import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
-import scala.Char;
 import scala.Tuple2;
 
 import java.util.*;
@@ -28,11 +27,12 @@ import java.io.IOException;
  *
  * Input Format (CSV): x, y, label (where label is either 'A' or 'B')
  *
- *
  * Dependencies: Apache Spark, Spark MLlib
  *
- * Author: Faedo Giovanni, Prioli Giacomo, Francescato Daniele
- * Date: [Your Date]
+ * Authors:
+ * - Faedo Giovanni - Student ID: 2149759
+ * - Prioli Giacomo - Student ID: 2166293
+ * - Francescato Daniele - Student ID: 2160563
  */
 
 
@@ -210,9 +210,14 @@ public class G01HW1 {
             return new Tuple2<>(localA, localB); // Return updated count pair
         }).sortByKey();
 
-        List<Tuple2<Integer, Tuple2<Integer, Integer>>> result = points.collect();
+        /*
+         * Print formatted output for each centroid.
+         * For each centroid index, print its coordinates along with the number of A and B points assigned to it.
+         * The output format is:
+         * i = <centroid index>, center = (<x>, <y>), NA<i> = <count>, NB<i> = <count>
+         */
 
-        // Print formatted output for each centroid
+        List<Tuple2<Integer, Tuple2<Integer, Integer>>> result = points.collect();
         for (Tuple2<Integer, Tuple2<Integer, Integer>> entry : result) {
             int centroidId = entry._1;
             int countA = entry._2._1;
@@ -222,6 +227,8 @@ public class G01HW1 {
             System.out.printf("i = %d, center = (%.6f, %.6f), NA%d = %d, NB%d = %d%n",
                     centroidId, centroids[centroidId].apply(0), centroids[centroidId].apply(1), centroidId, countA, centroidId, countB);
         }
+
+
 
     }
 
@@ -241,26 +248,54 @@ public class G01HW1 {
     public static double MRComputeStandardObjective(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
     {
 
-        // MAP PHASE (per partizione): Calcola la distanza al quadrato di ogni punto dal centroide più vicino
+        /*
+         * MAP PHASE (per partition):
+         * For each point, find the closest centroid and compute the squared Euclidean distance
+         * between the point and that centroid. The output is a pair:
+         * (centroid index, squared distance)
+         */
+
         JavaPairRDD<Integer, Double> distances = all_points.mapPartitionsToPair(partition -> {
+            // Temporary list to collect (centroid index, squared distance) pairs
             List<Tuple2<Integer, Double>> results = new ArrayList<>();
+
+            // Iterate through each point in the partition
             while (partition.hasNext()) {
                 Tuple2<Vector, Character> p = partition.next();
                 Vector point = p._1;
+
+                // Find the index of the closest centroid for the current point
                 int closest_idx_centroid = findClosestCentroid(point, centroids);
+
+                // Compute the squared distance from the point to the closest centroid
                 double minDistance = Vectors.sqdist(point, centroids[closest_idx_centroid]);
+
+                // Add the result pair to the list
                 results.add(new Tuple2<>(closest_idx_centroid, minDistance));
             }
+
+            // Return an iterator over the list of results
             return results.iterator();
-        }).reduceByKey(Double::sum); // REDUCE PHASE: Sum the squared distances for each centroid
+        })
+
+        /*
+        * REDUCE PHASE:
+        * Sum all squared distances associated with the same centroid index.
+        * This yields the total squared distance per centroid.
+        */
+
+        .reduceByKey((a, b) -> a + b); // REDUCE PHASE: Sum the squared distances for each centroid
 
 
-        //JavaPairRDD<Integer, Double> totalDistances = distances.reduceByKey((a,b) -> a + b);
-        // Compute the total distance and the average distance
+        // Count the total number of points in the dataset
         long totalPoints = all_points.count();
-        double sumDistance = distances.map( t -> t._2).reduce(Double::sum);
-        // Return the average squared distance (Delta)
+
+        // Sum all squared distances across all centroids
+        double sumDistance = distances.map( t -> t._2).reduce((a, b) -> a + b);
+
+        // Compute the average squared distance (delta value)
         double delta = sumDistance / totalPoints;
+
         return delta;
     }
 
