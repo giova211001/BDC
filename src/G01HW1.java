@@ -100,22 +100,22 @@ public class G01HW1 {
             distinct lines of the file
          */
         // Read the input file into an RDD and repartition it into L partitions
-        JavaRDD<String> raw_data = ctx.textFile(file_path).repartition(L).cache();
+        JavaRDD<String> inputPoints = ctx.textFile(file_path).repartition(L).cache();
 
         // Global variables to store counts of points, points in group A, and points in group B
-        long points, number_a, number_b;
-        points = raw_data.count(); // Total number of points
-        number_a = raw_data.filter(line -> line.trim().endsWith("A")).count(); // Count of points of group A
-        number_b = raw_data.filter(line -> line.trim().endsWith("B")).count(); // Count of points of group B
+        long N, NA, NB;
+        N = inputPoints.count(); // Total number of points
+        NA = inputPoints.filter(line -> line.trim().endsWith("A")).count(); // Count of points of group A
+        NB = inputPoints.filter(line -> line.trim().endsWith("B")).count(); // Count of points of group B
 
         // Print input parameters and dataset statistic (total number of points, total number of points
         // with label 'A' and total number of points with label 'B')
         System.out.println("Input file = " + file_path + ", L = " + L + ", K = " + K + ", M = " + M);
-        System.out.println("N = " + points + ", NA = " + number_a + ", NB = " + number_b);
+        System.out.println("N = " + N + ", NA = " + NA + ", NB = " + NB);
 
 
         // MAP PHASE: Transform the input data into a tuple of (Vector, Label) pairs
-        JavaPairRDD<Vector, Character> U = raw_data.mapToPair(line -> {
+        JavaPairRDD<Vector, Character> U = inputPoints.mapToPair(line -> {
             String[] parts = line.split(",");
             double[] values = {Double.parseDouble(parts[0]), Double.parseDouble(parts[1])}; // // Extract point coordinates
             Vector point = Vectors.dense(values); // Create Vector for the point with the dense() method
