@@ -2,12 +2,14 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
 import scala.Tuple2;
 
+import java.io.Serializable;
 import java.util.*;
 
 import java.io.IOException;
@@ -37,6 +39,14 @@ import java.io.IOException;
 
 
 public class G01HW2 {
+
+    public class Point implements Serializable{
+        private Vector coordinates; //coordinate del punto
+        private int group; //0 = A, 1 = B
+
+        public Vector getCoordinates() { return coordinates;}
+        public int getGroup() {return group;}
+    }
 
     public static void main(String[] args) throws IOException {
 
@@ -133,7 +143,7 @@ public class G01HW2 {
         }).cache(); // Cache the RDD for performance
 
 
-
+        MRFairLloyd(U, K, M);
 
 
 
@@ -203,8 +213,29 @@ public class G01HW2 {
         return xDist;
     }
 
-    public static double MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
+    //Default method offered by Spark to compute the centroids with K clusters and M iterations
+    public static List<Vector> MRLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
+        //Inizialize a set C of K centroids
+        // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
+        JavaRDD<Vector> pointsRDD = all_points.keys();
+
+        // Apply KMeans to compute the centroids (cluster centers)
+        KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M); // Train the KMeans model with K clusters and M iterations
+        Vector[] centroids = model.clusterCenters();
+        List<Vector> centroidList = Arrays.asList(centroids);
+        return centroidList;
+    }
+
+
+    public static List<Vector> MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
+    {
+        // Step 1: inizializza K centroidi con KMeans|| (Spark)
+        // Step 2: per M volte:
+        //         a. assegna ogni punto al centroide più vicino
+        //         b. per ogni gruppo di punti (cluster), calcola un nuovo centroide "fair"
+        // Step 3: ritorna la lista dei centroidi finali
+
         //Inizialize a set C of K centroids
         // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
         JavaRDD<Vector> pointsRDD = all_points.keys();
@@ -212,21 +243,18 @@ public class G01HW2 {
         // Apply KMeans to compute the centroids (cluster centers)
         KMeansModel model = KMeans.train(pointsRDD.rdd(), K, 0); // Train the KMeans model with K clusters and M iterations
         Vector[] centroids = model.clusterCenters();
+        List<Vector> centroidList = Arrays.asList(centroids);
 
-        //Repeat M times:
-        //2.1. Partition 𝑈
-        // into 𝑘
-        // clusters 𝑈1,𝑈2,⋯,𝑈𝑘
-        //, where 𝑈𝑖
-        // consists of the points of 𝑈
-        // whose closest current centroid is 𝑐𝑖
-        //  (assume that ties are broken in favor of the smallest index).
-        //2.2. Compute a new set {𝑐1,𝑐2,…,𝑐𝑘}
-        // of 𝑘
-        // centroids using the CentroidsSelection algorithm described here.
+        //inizialize the loop (M times)
+        for(int iter = 0; iter < M; iter++)
+        {
 
 
-        return 0;
+        }
+
+
+
+        return null;
     }
 
     /**
