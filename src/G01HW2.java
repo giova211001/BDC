@@ -178,6 +178,31 @@ public class G01HW2 {
 
     }
 
+
+    //function implement by the professor to compute the new set of centroids
+    public static double[] computeVectorX(double fixedA, double fixedB, double[] alpha, double[] beta, double[] ell, int K) {
+        double gamma = 0.5;
+        double[] xDist = new double[K];
+        double fA, fB;
+        double power = 0.5;
+        int T = 10;
+        for (int t=1; t<=T; t++){
+            fA = fixedA;
+            fB = fixedB;
+            power = power/2;
+            for (int i=0; i<K; i++) {
+                double temp = (1-gamma)*beta[i]*ell[i]/(gamma*alpha[i]+(1-gamma)*beta[i]);
+                xDist[i]=temp;
+                fA += alpha[i]*temp*temp;
+                temp=(ell[i]-temp);
+                fB += beta[i]*temp*temp;
+            }
+            if (fA == fB) {break;}
+            gamma = (fA > fB) ? gamma+power : gamma-power;
+        }
+        return xDist;
+    }
+
     public static double MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
         //Inizialize a set C of K centroids
