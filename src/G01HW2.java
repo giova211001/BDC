@@ -293,6 +293,96 @@ public class G01HW2 {
 
     }
 
+    public static void MRPrintStatistics(JavaPairRDD<Vector, Character> all_points, Vector[] centroids)
+    {
+
+        if(centroids.length == 0) {
+            throw new IllegalArgumentException("Centroids array cannot be empty.");
+        }
+
+        /*
+         * MAP PHASE (per partition):
+         * For each point in the partition, find its closest centroid.
+         * Then emit a pair (centroid index, (1, 0)) if the point belongs to group A,
+         * or (centroid index, (0, 1)) if it belongs to group B.
+         * The resulting RDD has structure: (centroid index, (countA, countB))
+         */
+        JavaPairRDD<Integer, Tuple2<Integer, Integer>> points = all_points.mapPartitionsToPair(iter -> {
+
+                    // Temporary list to collect output tuples from this partition
+                    List<Tuple2<Integer, Tuple2<Integer, Integer>>> results = new ArrayList<>();
+
+                    // Iterate over all points in the partition
+                    while(iter.hasNext()){
+                        Tuple2<Vector, Character> p = iter.next();
+                        Vector point = p._1;
+                        Character lab = p._2;
+
+                        // Find the index of the closest centroid for the current point
+                        int centroid_idx = findClosestCentroid(point, centroids);
+
+
+                        // Create a pair (centroid index, (1, 0)) if the point belongs to group A,
+                        // or (centroid index, (0, 1)) if it belongs to group B
+                        if (lab == 'A')
+                            results.add(new Tuple2<>(centroid_idx, new Tuple2<>(1, 0)));
+                        else
+                            results.add(new Tuple2<>(centroid_idx, new Tuple2<>(0, 1)));
+                    }
+
+                    // Return all results for this partition
+                    return results.iterator();
+
+
+                })
+
+                /*
+                 * REDUCE PHASE:
+                 * Sum the (countA, countB) tuples for each centroid index to obtain the total
+                 * number of A and B points assigned to each cluster.
+                 */
+
+                .reduceByKey((a,b) -> {
+                    int localA = a._1 + b._1; // Sum of points with label A
+                    int localB = a._2 + b._2; // Sum of points with label B
+
+                    return new Tuple2<>(localA, localB); // Return updated count pair
+                })
+
+                // Sort the results by centroid index (for clean output order)
+                .sortByKey();
+
+        /*
+         * Print formatted output for each centroid.
+         * For each centroid index, print its coordinates along with the number of A and B points assigned to it.
+         * The output format is:
+         * i = <centroid index>, center = (<x>, <y>), NA<i> = <count>, NB<i> = <count>
+         */
+
+        List<Tuple2<Integer, Tuple2<Integer, Integer>>> result = points.collect();
+        for (Tuple2<Integer, Tuple2<Integer, Integer>> entry : result) {
+            int centroidId = entry._1;
+            int countA = entry._2._1;
+            int countB = entry._2._2;
+
+            //new code added to correct feedback from hw1
+            Vector center = centroids[centroidId];
+            StringBuilder coords = new StringBuilder();
+            coords.append("(");
+            for (int i = 0; i < center.size(); i++) {
+                coords.append(String.format("%.6f", center.apply(i)));
+                if (i < center.size() - 1)
+                    coords.append(", ");
+            }
+            coords.append(")");
+
+            System.out.printf("i = %d, center = %s, NA%d = %d, NB%d = %d%n",
+                    centroidId, coords.toString(), centroidId, countA, centroidId, countB);
+
+        }
+
+    }
+
 }
 
 
