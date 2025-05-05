@@ -143,7 +143,16 @@ public class G01HW2 {
         }).cache(); // Cache the RDD for performance
 
 
-        MRFairLloyd(U, K, M);
+        //prova di stampa
+        long startTime = System.currentTimeMillis(); // Inizio
+        MRLloyd(U, K, M);
+        long endTime = System.currentTimeMillis();   // Fine
+        // Calcolo tempo totale in millisecondi
+        long elapsedMillis = endTime - startTime;
+        // Conversione in secondi
+        double elapsedSeconds = elapsedMillis / 1000.0;
+
+        System.out.println("Tempo di esecuzione: " + elapsedSeconds + " secondi");
 
 
 
