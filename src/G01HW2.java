@@ -143,17 +143,27 @@ public class G01HW2 {
         }).cache(); // Cache the RDD for performance
 
 
-        //prova di stampa
-        long startTime = System.currentTimeMillis(); // Inizio
-        MRLloyd(U, K, M);
-        long endTime = System.currentTimeMillis();   // Fine
+        System.out.println("COMPUTAZIONE STANDARD");
+        long startStandard = System.currentTimeMillis(); // Inizio
+        List<Vector> C_stand = MRLloyd(U, K, M);
+        long endStandard = System.currentTimeMillis();   // Fine
         // Calcolo tempo totale in millisecondi
-        long elapsedMillis = endTime - startTime;
+        long elapsedStandard = endStandard - startStandard;
         // Conversione in secondi
-        double elapsedSeconds = elapsedMillis / 1000.0;
+        double elapsedSecondsS = elapsedStandard / 1000.0;
 
-        System.out.println("Tempo di esecuzione: " + elapsedSeconds + " secondi");
+        System.out.println("Tempo di esecuzione: " + elapsedSecondsS + " secondi");
+        System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
 
+        //COMPUTAZIONE FATTA DA NOI
+        System.out.println("COMPUTAZIONE FAIR");
+        long startFair = System.currentTimeMillis();
+        List<Vector> C_Fair = MRFairLloyd(U, K, M);
+        long endFair = System.currentTimeMillis();
+        long elapsedFair = endFair - startFair;
+        double elapsedSecondsF = elapsedFair/ 1000.0;
+        System.out.println("Tempo di esecuzione: " + elapsedSecondsF + " secondi");
+        System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
 
 
     }
@@ -258,13 +268,68 @@ public class G01HW2 {
         //inizialize the loop (M times)
         for(int iter = 0; iter < M; iter++)
         {
+            Broadcast<Vector[]> broadcastCentroids = JavaSparkContext.fromSparkContext(all_points.context()).broadcast(
+                    centroidList.toArray(new Vector[0]));
+
+            //Assegna ogni punto al centroide più vicino
+            JavaPairRDD<Integer, Tuple2<Vector, Character>> clusteredPoints = all_points.mapToPair( point -> {
+                Vector vec = point._1;
+                Character group = point._2;
+                int closest = findClosestCentroid(vec, broadcastCentroids.value());
+                return new Tuple2<>(closest, new Tuple2<>(vec, group));
+            });
+
+
+            //Raggruppa per indice del centroide
+            JavaPairRDD<Integer, Iterable<Tuple2<Vector, Character>>> clusters = clusteredPoints.groupByKey();
+
+            //Ricalcola i centroidi fair in modo distribuito
+            JavaPairRDD<Integer, Vector> newCentroidsRDD = clusters.mapValues( clusterPoints -> {
+                List<Vector> vectors = new ArrayList<>();
+                List<Character> groups = new ArrayList<>();
+
+                for (Tuple2<Vector, Character> p : clusterPoints) {
+                    vectors.add(p._1);
+                    groups.add(p._2);
+                }
+
+                int n = vectors.size();
+                double[] alpha = new double[n];
+                double[] beta = new double[n];
+                double[] ell = new double[n];
+
+                for (int i = 0; i < n; i++) {
+                    alpha[i] = (groups.get(i) == 'A') ? 1.0 : 0.0;
+                    beta[i] = (groups.get(i) == 'B') ? 1.0 : 0.0;
+                    ell[i] = 1.0;
+                }
+
+                double[] xDist = computeVectorX(0.0, 0.0, alpha, beta, ell, n);
+                int dim = vectors.get(0).size();
+                double[] newCenter = new double[dim];
+
+                for (int i = 0; i < n; i++) {
+                    double[] vecArr = vectors.get(i).toArray();
+                    for (int j = 0; j < dim; j++) {
+                        newCenter[j] += xDist[i] * vecArr[j];
+                    }
+                }
+
+                return Vectors.dense(newCenter);
+            });
+
+            // 3.4 Raccogli i nuovi centroidi (pochi, quindi OK sul driver)
+            List<Vector> updatedCentroids = newCentroidsRDD.sortByKey().values().collect();
+            centroidList = updatedCentroids;
+
+
 
 
         }
 
 
 
-        return null;
+        return centroidList;
     }
 
     /**
