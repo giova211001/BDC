@@ -100,7 +100,7 @@ public class G01HW2 {
         }
 
         // SPARK SETUP : Initialize Spark context and configurations
-        SparkConf conf = new SparkConf(true).setAppName("G01HW1"); // Set the application name for Spark
+        SparkConf conf = new SparkConf(true).setAppName("G01HW2"); // Set the application name for Spark
         JavaSparkContext ctx = new JavaSparkContext(conf); // Create the JavaSparkContext to interact with Spark
         ctx.setLogLevel("OFF"); // Turn off Spark logging for cleaner output
 
@@ -138,7 +138,7 @@ public class G01HW2 {
             }
 
             Vector point = Vectors.dense(values); // Create Vector for the point with the dense() method
-            char label = parts[parts.length - 1]    .trim().charAt(0); // Extract the label ('A' or 'B')
+            char label = parts[parts.length - 1].trim().charAt(0); // Extract the label ('A' or 'B')
             return new Tuple2<>(point, label);
         }).cache(); // Cache the RDD for performance
 
@@ -237,6 +237,7 @@ public class G01HW2 {
     }
 
 
+    //Method implements by us to find the centroids
     public static List<Vector> MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
         // Step 1: inizializza K centroidi con KMeans|| (Spark)
