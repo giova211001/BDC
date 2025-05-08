@@ -40,12 +40,12 @@ import java.io.IOException;
 
 public class G01HW2 {
 
-    public class Point implements Serializable{
-        private Vector coordinates; //coordinate del punto
-        private int group; //0 = A, 1 = B
-
-        public Vector getCoordinates() { return coordinates;}
-        public int getGroup() {return group;}
+    public class ClusterStats {
+        double alpha;
+        double beta;
+        Vector muA;
+        Vector muB;
+        double l;
     }
 
     public static void main(String[] args) throws IOException {
@@ -265,68 +265,79 @@ public class G01HW2 {
         Vector[] centroids = model.clusterCenters();
         List<Vector> centroidList = Arrays.asList(centroids);
 
-        //inizialize the loop (M times)
-        for(int iter = 0; iter < M; iter++)
-        {
-            Broadcast<Vector[]> broadcastCentroids = JavaSparkContext.fromSparkContext(all_points.context()).broadcast(
-                    centroidList.toArray(new Vector[0]));
+        for (int iter = 0; iter < M; iter++) {
+            Broadcast<Vector[]> broadcastCentroids = JavaSparkContext.fromSparkContext(all_points.context())
+                    .broadcast(centroidList.toArray(new Vector[0]));
 
-            //Assegna ogni punto al centroide più vicino
-            JavaPairRDD<Integer, Tuple2<Vector, Character>> clusteredPoints = all_points.mapToPair( point -> {
+            // Assegna ogni punto al centroide più vicino
+            JavaPairRDD<Integer, Tuple2<Vector, Character>> clusteredPoints = all_points.mapToPair(point -> {
                 Vector vec = point._1;
                 Character group = point._2;
                 int closest = findClosestCentroid(vec, broadcastCentroids.value());
                 return new Tuple2<>(closest, new Tuple2<>(vec, group));
             });
 
+            // Raggruppa per cluster
+            JavaPairRDD<Integer, Iterable<Tuple2<Vector, Character>>> groupedByCluster = clusteredPoints.groupByKey();
 
-            //Raggruppa per indice del centroide
-            JavaPairRDD<Integer, Iterable<Tuple2<Vector, Character>>> clusters = clusteredPoints.groupByKey();
+            // Conta i totali globali per A e B (li calcoliamo una sola volta fuori dal ciclo)
+            long totalA = all_points.filter(p -> p._2 == 'A').count();
+            long totalB = all_points.filter(p -> p._2 == 'B').count();
 
-            //Ricalcola i centroidi fair in modo distribuito
-            JavaPairRDD<Integer, Vector> newCentroidsRDD = clusters.mapValues( clusterPoints -> {
-                List<Vector> vectors = new ArrayList<>();
-                List<Character> groups = new ArrayList<>();
+            // Inizializza i vettori
+            double[] alpha = new double[K];
+            double[] beta = new double[K];
+            double[] l = new double[K];
+            Vector[] muA = new Vector[K];
+            Vector[] muB = new Vector[K];
 
-                for (Tuple2<Vector, Character> p : clusterPoints) {
-                    vectors.add(p._1);
-                    groups.add(p._2);
+            Map<Integer, Iterable<Tuple2<Vector, Character>>> clusterMap = groupedByCluster.collectAsMap();
+
+            for (int i = 0; i < K; i++) {
+                Iterable<Tuple2<Vector, Character>> points = clusterMap.get(i);
+                List<Vector> groupA = new ArrayList<>();
+                List<Vector> groupB = new ArrayList<>();
+
+                for (Tuple2<Vector, Character> entry : points) {
+                    if (entry._2 == 'A') groupA.add(entry._1);
+                    else if (entry._2 == 'B') groupB.add(entry._1);
                 }
 
-                int n = vectors.size();
-                double[] alpha = new double[n];
-                double[] beta = new double[n];
-                double[] ell = new double[n];
+                muA[i] = computeCentroid(groupA);
+                muB[i] = computeCentroid(groupB);
 
-                for (int i = 0; i < n; i++) {
-                    alpha[i] = (groups.get(i) == 'A') ? 1.0 : 0.0;
-                    beta[i] = (groups.get(i) == 'B') ? 1.0 : 0.0;
-                    ell[i] = 1.0;
-                }
+                alpha[i] = (double) groupA.size() / totalA;
+                beta[i] = (double) groupB.size() / totalB;
+                l[i] = Math.sqrt(Vectors.sqdist(muA[i], muB[i]));
+            }
 
-                double[] xDist = computeVectorX(0.0, 0.0, alpha, beta, ell, n);
-                int dim = vectors.get(0).size();
-                double[] newCenter = new double[dim];
+            // Calcola fixedA
+            double deltaA = all_points.filter(p -> p._2 == 'A').mapToDouble(p -> {
+                int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
+                return squaredDistance(p._1, muA[cluster]);
+            }).reduce(Double::sum);
 
-                for (int i = 0; i < n; i++) {
-                    double[] vecArr = vectors.get(i).toArray();
-                    for (int j = 0; j < dim; j++) {
-                        newCenter[j] += xDist[i] * vecArr[j];
-                    }
-                }
+            // Calcola fixedB
+            double deltaB = all_points.filter(p -> p._2 == 'B').mapToDouble(p -> {
+                int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
+                return squaredDistance(p._1, muB[cluster]);
+            }).reduce(Double::sum);
 
-                return Vectors.dense(newCenter);
-            });
+            double fixedA = deltaA / totalA;
+            double fixedB = deltaB / totalB;
 
-            // 3.4 Raccogli i nuovi centroidi (pochi, quindi OK sul driver)
-            List<Vector> updatedCentroids = newCentroidsRDD.sortByKey().values().collect();
-            centroidList = updatedCentroids;
+            // Calcola x tramite la funzione fornita
+            double[] x = computeVectorX(fixedA, fixedB, alpha, beta, l, K);
 
+            // Calcola i nuovi centroidi fair
+            List<Vector> newCentroids = new ArrayList<>();
+            for (int i = 0; i < K; i++) {
+                Vector ci = combineVectors(muA[i], muB[i], (l[i] - x[i]) / l[i], x[i] / l[i]);
+                newCentroids.add(ci);
+            }
 
-
-
+            centroidList = newCentroids;
         }
-
 
 
         return centroidList;
@@ -510,8 +521,51 @@ public class G01HW2 {
         }
 
     }
+    public static Vector computeCentroid(List<Vector> vectors) {
+
+        if (vectors.isEmpty()) return Vectors.zeros(0);
+
+        int dim = vectors.get(0).size();
+        double[] sum = new double[dim];
+
+        for (Vector vec : vectors) {
+            for (int i = 0; i < dim; i++) {
+                sum[i] += vec.apply(i);
+            }
+        }
+
+        for (int i = 0; i < dim; i++) {
+            sum[i] /= vectors.size();
+        }
+
+        return Vectors.dense(sum);
+    }
+
+    public static double squaredDistance(Vector v1, Vector v2) {
+        int dim = v1.size();
+        double sum = 0.0;
+        for (int i = 0; i < dim; i++) {
+        double diff = v1.apply(i) - v2.apply(i);
+        sum += diff * diff;
+        }
+        return sum;
+        }
+
+        public static Vector combineVectors(Vector v1, Vector v2, double weight1, double weight2) {
+        int dim = v1.size();
+        double[] result = new double[dim];
+        for (int i = 0; i < dim; i++) {
+            result[i] = weight1 * v1.apply(i) + weight2 * v2.apply(i);
+        }
+        return Vectors.dense(result);
+    }
+
+
 
 }
+
+
+
 
 
 
