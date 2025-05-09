@@ -9,7 +9,7 @@ import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
 import scala.Tuple2;
 
-import java.io.Serializable;
+import java.text.DateFormat;
 import java.util.*;
 
 import java.io.IOException;
@@ -142,28 +142,41 @@ public class G01HW2 {
             return new Tuple2<>(point, label);
         }).cache(); // Cache the RDD for performance
 
-
-        System.out.println("COMPUTAZIONE STANDARD");
-        long startStandard = System.currentTimeMillis(); // Inizio
+        //Standard Computing output
+        System.out.println("STANDARD COMPUTING");
+        long startStandard = System.currentTimeMillis();
+        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(startStandard));
         List<Vector> C_stand = MRLloyd(U, K, M);
-        long endStandard = System.currentTimeMillis();   // Fine
-        // Calcolo tempo totale in millisecondi
+        long endStandard = System.currentTimeMillis();
+        System.out.println("End at: "+ DateFormat.getDateTimeInstance().format(endStandard));
         long elapsedStandard = endStandard - startStandard;
-        // Conversione in secondi
         double elapsedSecondsS = elapsedStandard / 1000.0;
 
-        System.out.println("Tempo di esecuzione: " + elapsedSecondsS + " secondi");
+        System.out.println("Elapsed execution time: " + elapsedSecondsS + " seconds");
+        long startComputeStandard = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
+        long endComputeStandard = System.currentTimeMillis();
+        long elapsedComputeStandard = endComputeStandard-startComputeStandard;
+        double elapsedSecondsCS = elapsedComputeStandard/1000.0;
+        System.out.println("Elapsed computing time: " + elapsedSecondsCS + " seconds");
 
-        //COMPUTAZIONE FATTA DA NOI
-        System.out.println("COMPUTAZIONE FAIR");
+        //Fair Computing output
+        System.out.println("FAIR COMPUTING");
         long startFair = System.currentTimeMillis();
+        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(startFair));
         List<Vector> C_Fair = MRFairLloyd(U, K, M);
         long endFair = System.currentTimeMillis();
+        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(endFair));
         long elapsedFair = endFair - startFair;
         double elapsedSecondsF = elapsedFair/ 1000.0;
-        System.out.println("Tempo di esecuzione: " + elapsedSecondsF + " secondi");
+
+        System.out.println("Elapsed execution time: " + elapsedSecondsF + " seconds");
+        long startComputeFair = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
+        long endComputeFair = System.currentTimeMillis();
+        long elapsedComputeFair = endComputeFair-startComputeFair;
+        double elapsedSecondsCF = elapsedComputeFair/1000.0;
+        System.out.println("Elapsed computing time: " + elapsedSecondsCF + " seconds");
 
 
     }
@@ -193,7 +206,7 @@ public class G01HW2 {
             // with the method sqdist of class Vector
             double distance = Vectors.sqdist(point, centroids[i]);
 
-            // Update closest centroid if a nearer one is found
+            // Update the closest centroid if a nearer one is found
             if(distance < min_distance)
             {
                 min_distance = distance;
@@ -233,43 +246,44 @@ public class G01HW2 {
     }
 
     //Default method offered by Spark to compute the centroids with K clusters and M iterations
+    /*
+    HOMEWORKS
+    - controllo codice
+    - se vuoi commentare (javadoc su cgpt)
+    - manca tempo esecuzione di MRFairCompute (ora calcola solo il valore)
+    - BUONA SCOPATA
+     */
     public static List<Vector> MRLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
-        //Inizialize a set C of K centroids
-        // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
+
+        //Initialize a set C of K centroids
+        //Extract only the point (vector) from the (point, group) pairs to compute the k-centroids
         JavaRDD<Vector> pointsRDD = all_points.keys();
 
         // Apply KMeans to compute the centroids (cluster centers)
         KMeansModel model = KMeans.train(pointsRDD.rdd(), K, M); // Train the KMeans model with K clusters and M iterations
         Vector[] centroids = model.clusterCenters();
-        List<Vector> centroidList = Arrays.asList(centroids);
-        return centroidList;
+        return Arrays.asList(centroids);
     }
 
 
     //Method implements by us to find the centroids
     public static List<Vector> MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
-        // Step 1: inizializza K centroidi con KMeans|| (Spark)
-        // Step 2: per M volte:
-        //         a. assegna ogni punto al centroide più vicino
-        //         b. per ogni gruppo di punti (cluster), calcola un nuovo centroide "fair"
-        // Step 3: ritorna la lista dei centroidi finali
+        // Step 1: initialize K centroids with K-Means (Spark)
+        // Step 2: repeat M times:
+        //         a. assign each point to the closest centroid
+        //         b. compute a new fair centroid for each cluster
+        // Step 3: return the final list of centroids
 
-        //Inizialize a set C of K centroids
-        // Estract only the point (vector) from the (point, group) pairs to compute the k-centroids
-        JavaRDD<Vector> pointsRDD = all_points.keys();
-
-        // Apply KMeans to compute the centroids (cluster centers)
-        KMeansModel model = KMeans.train(pointsRDD.rdd(), K, 0); // Train the KMeans model with K clusters and M iterations
-        Vector[] centroids = model.clusterCenters();
-        List<Vector> centroidList = Arrays.asList(centroids);
+        List<Vector> centroidList = MRLloyd(all_points,K,M);
 
         for (int iter = 0; iter < M; iter++) {
+            //Broadcasting vector between all the tasks for efficiency
             Broadcast<Vector[]> broadcastCentroids = JavaSparkContext.fromSparkContext(all_points.context())
                     .broadcast(centroidList.toArray(new Vector[0]));
 
-            // Assegna ogni punto al centroide più vicino
+            // Assign every point to the closest centroid
             JavaPairRDD<Integer, Tuple2<Vector, Character>> clusteredPoints = all_points.mapToPair(point -> {
                 Vector vec = point._1;
                 Character group = point._2;
@@ -277,14 +291,14 @@ public class G01HW2 {
                 return new Tuple2<>(closest, new Tuple2<>(vec, group));
             });
 
-            // Raggruppa per cluster
+            // Group by cluster
             JavaPairRDD<Integer, Iterable<Tuple2<Vector, Character>>> groupedByCluster = clusteredPoints.groupByKey();
 
-            // Conta i totali globali per A e B (li calcoliamo una sola volta fuori dal ciclo)
+            // Count global totals for A and B (computed once outside the loop)
             long totalA = all_points.filter(p -> p._2 == 'A').count();
             long totalB = all_points.filter(p -> p._2 == 'B').count();
 
-            // Inizializza i vettori
+            // Initializing vectors
             double[] alpha = new double[K];
             double[] beta = new double[K];
             double[] l = new double[K];
@@ -311,13 +325,13 @@ public class G01HW2 {
                 l[i] = Math.sqrt(Vectors.sqdist(muA[i], muB[i]));
             }
 
-            // Calcola fixedA
+            // Computing fixedA
             double deltaA = all_points.filter(p -> p._2 == 'A').mapToDouble(p -> {
                 int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
                 return squaredDistance(p._1, muA[cluster]);
             }).reduce(Double::sum);
 
-            // Calcola fixedB
+            // Computing fixedB
             double deltaB = all_points.filter(p -> p._2 == 'B').mapToDouble(p -> {
                 int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
                 return squaredDistance(p._1, muB[cluster]);
@@ -326,10 +340,10 @@ public class G01HW2 {
             double fixedA = deltaA / totalA;
             double fixedB = deltaB / totalB;
 
-            // Calcola x tramite la funzione fornita
+            // Compute x using the given function
             double[] x = computeVectorX(fixedA, fixedB, alpha, beta, l, K);
 
-            // Calcola i nuovi centroidi fair
+            // Compute new fair centroids
             List<Vector> newCentroids = new ArrayList<>();
             for (int i = 0; i < K; i++) {
                 Vector ci = combineVectors(muA[i], muB[i], (l[i] - x[i]) / l[i], x[i] / l[i]);
@@ -425,9 +439,8 @@ public class G01HW2 {
         double fairObjectiveB = totalB / NB;
 
         // Return the maximum of the two group costs (phi value)
-        double phi = Math.max(fairObjectiveA, fairObjectiveB);
 
-        return phi;
+        return Math.max(fairObjectiveA, fairObjectiveB);
 
 
     }
@@ -516,7 +529,7 @@ public class G01HW2 {
             coords.append(")");
 
             System.out.printf("i = %d, center = %s, NA%d = %d, NB%d = %d%n",
-                    centroidId, coords.toString(), centroidId, countA, centroidId, countB);
+                    centroidId, coords, centroidId, countA, centroidId, countB);
 
         }
 
