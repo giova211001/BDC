@@ -151,12 +151,12 @@ public class G01HW2 {
         System.out.println("End at: "+ DateFormat.getDateTimeInstance().format(endStandard));
         long elapsedStandard = endStandard - startStandard;
 
-        System.out.println("Elapsed execution time: " + elapsedStandard + " milliseconds");
+        System.out.println("Elapsed execution time: " + elapsedStandard + " ms");
         long startComputeStandard = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
         long endComputeStandard = System.currentTimeMillis();
         long elapsedComputeStandard = endComputeStandard-startComputeStandard;
-        System.out.println("Elapsed computing time: " + elapsedComputeStandard + " milliseconds");
+        System.out.println("Elapsed computing time: " + elapsedComputeStandard + " ms");
 
         //Fair Computing output
         System.out.println("FAIR COMPUTING");
@@ -167,12 +167,12 @@ public class G01HW2 {
         System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(endFair));
         long elapsedFair = endFair - startFair;
 
-        System.out.println("Elapsed execution time: " + elapsedFair + " milliseconds");
+        System.out.println("Elapsed execution time: " + elapsedFair + " ms");
         long startComputeFair = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
         long endComputeFair = System.currentTimeMillis();
         long elapsedComputeFair = endComputeFair-startComputeFair;
-        System.out.println("Elapsed computing time: " + elapsedComputeFair + " milliseconds");
+        System.out.println("Elapsed computing time: " + elapsedComputeFair + " ms");
 
 
     }
