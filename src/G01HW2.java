@@ -150,15 +150,13 @@ public class G01HW2 {
         long endStandard = System.currentTimeMillis();
         System.out.println("End at: "+ DateFormat.getDateTimeInstance().format(endStandard));
         long elapsedStandard = endStandard - startStandard;
-        double elapsedSecondsS = elapsedStandard / 1000.0;
 
-        System.out.println("Elapsed execution time: " + elapsedSecondsS + " seconds");
+        System.out.println("Elapsed execution time: " + elapsedStandard + " milliseconds");
         long startComputeStandard = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
         long endComputeStandard = System.currentTimeMillis();
         long elapsedComputeStandard = endComputeStandard-startComputeStandard;
-        double elapsedSecondsCS = elapsedComputeStandard/1000.0;
-        System.out.println("Elapsed computing time: " + elapsedSecondsCS + " seconds");
+        System.out.println("Elapsed computing time: " + elapsedComputeStandard + " milliseconds");
 
         //Fair Computing output
         System.out.println("FAIR COMPUTING");
@@ -168,15 +166,13 @@ public class G01HW2 {
         long endFair = System.currentTimeMillis();
         System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(endFair));
         long elapsedFair = endFair - startFair;
-        double elapsedSecondsF = elapsedFair/ 1000.0;
 
-        System.out.println("Elapsed execution time: " + elapsedSecondsF + " seconds");
+        System.out.println("Elapsed execution time: " + elapsedFair + " milliseconds");
         long startComputeFair = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
         long endComputeFair = System.currentTimeMillis();
         long elapsedComputeFair = endComputeFair-startComputeFair;
-        double elapsedSecondsCF = elapsedComputeFair/1000.0;
-        System.out.println("Elapsed computing time: " + elapsedSecondsCF + " seconds");
+        System.out.println("Elapsed computing time: " + elapsedComputeFair + " milliseconds");
 
 
     }
