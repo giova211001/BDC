@@ -8,8 +8,6 @@ import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.linalg.Vector;
 import scala.Tuple2;
-
-import java.text.DateFormat;
 import java.util.*;
 
 import java.io.IOException;
@@ -20,17 +18,17 @@ import java.io.IOException;
  * This program performs clustering on a 2D dataset using the KMeans algorithm implemented in Apache Spark.
  * In addition to the standard k-means objective function, it computes a fairness-aware clustering metric
  * that accounts for demographic parity between two groups labeled 'A' and 'B'.
- *
+ * /
  * The input consists of 2D points with a demographic label. The algorithm processes this input,
  * clusters the data into K groups using L partitions over M iterations, and computes:
  * - The standard k-means cost (Delta) --> function MRComputeStandardObjective
  * - The fairness k-means cost (Phi) --> function MRComputeFairObjective
  * - Statistics of group distribution across clusters --> function MRPrintStatistics
- *
+ * /
  * Input Format (CSV): x, y, label (where label is either 'A' or 'B')
- *
+ * /
  * Dependencies: Apache Spark, Spark MLlib
- *
+ * /
  * Authors:
  * - Faedo Giovanni - Student ID: 2149759
  * - Prioli Giacomo - Student ID: 2166293
@@ -48,7 +46,7 @@ public class G01HW2 {
         double l;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
 
         /*
         Set the location to Locale.US to have the output format with "." instead of ","
@@ -77,7 +75,7 @@ public class G01HW2 {
         int K = Integer.parseInt(args[2]); // Number of desired clusters
         int M = Integer.parseInt(args[3]); // Number of iterations for KMeans
 
-        /**
+        /*
          * Validates that K (number of clusters) and M (number of iterations) are positive integers.
          *
          * K-means cannot execute with:
@@ -91,7 +89,7 @@ public class G01HW2 {
             throw new IllegalArgumentException("K and M must be positive integers.");
         }
 
-        /**
+        /*
          * Basic validation: file_path must be non-null and non-empty
          * @throws IllegalArgumentException if K or M are non-positive
          */
