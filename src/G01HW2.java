@@ -145,13 +145,11 @@ public class G01HW2 {
         //Standard Computing output
         System.out.println("STANDARD COMPUTING");
         long startStandard = System.currentTimeMillis();
-        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(startStandard));
         List<Vector> C_stand = MRLloyd(U, K, M);
         long endStandard = System.currentTimeMillis();
-        System.out.println("End at: "+ DateFormat.getDateTimeInstance().format(endStandard));
         long elapsedStandard = endStandard - startStandard;
-
         System.out.println("Elapsed execution time: " + elapsedStandard + " ms");
+
         long startComputeStandard = System.currentTimeMillis();
         System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
         long endComputeStandard = System.currentTimeMillis();
@@ -161,15 +159,13 @@ public class G01HW2 {
         //Fair Computing output
         System.out.println("FAIR COMPUTING");
         long startFair = System.currentTimeMillis();
-        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(startFair));
         List<Vector> C_Fair = MRFairLloyd(U, K, M);
         long endFair = System.currentTimeMillis();
-        System.out.println("Start at: "+ DateFormat.getDateTimeInstance().format(endFair));
         long elapsedFair = endFair - startFair;
-
         System.out.println("Elapsed execution time: " + elapsedFair + " ms");
+
         long startComputeFair = System.currentTimeMillis();
-        System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
+        System.out.println("OBJECTIVE FUNCTION FAIR " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
         long endComputeFair = System.currentTimeMillis();
         long elapsedComputeFair = endComputeFair-startComputeFair;
         System.out.println("Elapsed computing time: " + elapsedComputeFair + " ms");
@@ -266,7 +262,7 @@ public class G01HW2 {
         //         b. compute a new fair centroid for each cluster
         // Step 3: return the final list of centroids
 
-        List<Vector> centroidList = MRLloyd(all_points,K,M);
+        List<Vector> centroidList = MRLloyd(all_points,K,0);
 
         for (int iter = 0; iter < M; iter++) {
             //Broadcasting vector between all the tasks for efficiency
@@ -562,9 +558,6 @@ public class G01HW2 {
         }
         return Vectors.dense(result);
     }
-
-
-
 }
 
 
