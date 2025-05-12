@@ -246,13 +246,7 @@ public class G01HW2 {
     }
 
     //Default method offered by Spark to compute the centroids with K clusters and M iterations
-    /*
-    HOMEWORKS
-    - controllo codice
-    - se vuoi commentare (javadoc su cgpt)
-    - manca tempo esecuzione di MRFairCompute (ora calcola solo il valore)
-    - BUONA SCOPATA
-     */
+
     public static List<Vector> MRLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
 
