@@ -140,33 +140,37 @@ public class G01HW2 {
             return new Tuple2<>(point, label);
         }).cache(); // Cache the RDD for performance
 
-        //Standard Computing output
-        System.out.println("STANDARD COMPUTING");
+
+        // STANDARD COMPUTING
         long startStandard = System.currentTimeMillis();
         List<Vector> C_stand = MRLloyd(U, K, M);
         long endStandard = System.currentTimeMillis();
         long elapsedStandard = endStandard - startStandard;
-        System.out.println("Elapsed execution time: " + elapsedStandard + " ms");
 
         long startComputeStandard = System.currentTimeMillis();
-        System.out.println("OBJECTIVE FUNCTION STANDARD " + MRComputeFairObjective(U, C_stand.toArray(new Vector[0])));
+        double fairObjStandard = MRComputeFairObjective(U, C_stand.toArray(new Vector[0]));
         long endComputeStandard = System.currentTimeMillis();
-        long elapsedComputeStandard = endComputeStandard-startComputeStandard;
-        System.out.println("Elapsed computing time: " + elapsedComputeStandard + " ms");
+        long elapsedComputeStandard = endComputeStandard - startComputeStandard;
 
-        //Fair Computing output
-        System.out.println("FAIR COMPUTING");
+        // FAIR COMPUTING
         long startFair = System.currentTimeMillis();
         List<Vector> C_Fair = MRFairLloyd(U, K, M);
         long endFair = System.currentTimeMillis();
         long elapsedFair = endFair - startFair;
-        System.out.println("Elapsed execution time: " + elapsedFair + " ms");
 
         long startComputeFair = System.currentTimeMillis();
-        System.out.println("OBJECTIVE FUNCTION FAIR " + MRComputeFairObjective(U, C_Fair.toArray(new Vector[0])));
+        double fairObjFair = MRComputeFairObjective(U, C_Fair.toArray(new Vector[0]));
         long endComputeFair = System.currentTimeMillis();
-        long elapsedComputeFair = endComputeFair-startComputeFair;
-        System.out.println("Elapsed computing time: " + elapsedComputeFair + " ms");
+        long elapsedComputeFair = endComputeFair - startComputeFair;
+
+        // STAMPA FINALE
+        System.out.println("Fair Objective with Standard Centers = " + fairObjStandard);
+        System.out.println("Fair Objective with Fair Centers = " + fairObjFair);
+        System.out.println("Time to compute standard centers = " + elapsedStandard + " ms");
+        System.out.println("Time to compute fair centers = " + elapsedFair + " ms");
+        System.out.println("Time to compute objective with standard centers = " + elapsedComputeStandard + " ms");
+        System.out.println("Time to compute objective with fair centers = " + elapsedComputeFair + " ms");
+
 
 
     }
