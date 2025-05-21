@@ -297,8 +297,10 @@ public class G01HW2 {
                 List<Vector> groupB = new ArrayList<>();
 
                 for (Tuple2<Vector, Character> entry : points) {
-                    if (entry._2 == 'A') groupA.add(entry._1);
-                    else if (entry._2 == 'B') groupB.add(entry._1);
+                    if (entry._2 == 'A')
+                        groupA.add(entry._1);
+                    else if (entry._2 == 'B')
+                        groupB.add(entry._1);
                 }
 
                 muA[i] = computeCentroid(groupA);
