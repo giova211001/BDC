@@ -36,14 +36,14 @@ public class G01GEN {
             for (int j = 0; j < pointsPerCluster; j++) {
                 double x = cx + rand.nextGaussian(); // Gaussian noise
                 double y = cy + rand.nextGaussian();
-                out.printf("%.4f %.4f %s%n", x, y, "A");
+                out.printf("%.4f,%.4f,%s%n", x, y, "A");
             }
 
             // Group B far from group A in same cluster index
             for (int j = 0; j < pointsPerCluster; j++) {
                 double x = cx + 5 + rand.nextGaussian(); // Shifted center to the right
                 double y = cy + 5 + rand.nextGaussian(); // Shifted up
-                out.printf("%.4f %.4f %s%n", x, y, "B");
+                out.printf("%.4f,%.4f,%s%n", x, y, "B");
             }
 
         }

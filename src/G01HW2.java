@@ -38,11 +38,19 @@ import java.io.IOException;
 
 public class G01HW2 {
 
+    /**
+     * Represents statistical parameters for a cluster
+     */
     public class ClusterStats {
+        // Alpha parameter
         double alpha;
+        // Beta parameter
         double beta;
+        // Mean vector of group A
         Vector muA;
+        // Mean vector of group B
         Vector muB;
+        // A scalar parameter
         double l;
     }
 
@@ -163,7 +171,7 @@ public class G01HW2 {
         long endComputeFair = System.currentTimeMillis();
         long elapsedComputeFair = endComputeFair - startComputeFair;
 
-        // STAMPA FINALE
+        // FINAL PRINT
         System.out.println("Fair Objective with Standard Centers = " + fairObjStandard);
         System.out.println("Fair Objective with Fair Centers = " + fairObjFair);
         System.out.println("Time to compute standard centers = " + elapsedStandard + " ms");
@@ -214,26 +222,50 @@ public class G01HW2 {
 
     }
 
-
-    //function implement by the professor to compute the new set of centroids
+    /**
+     * Computes a new vector of centroids (xDist) based on input parameters using
+     * an iterative approach to balance two cost functions fA and fB.
+     *
+     * @param fixedA Initial constant term added to fA.
+     * @param fixedB Initial constant term added to fB.
+     * @param alpha Array of alpha parameters for each cluster.
+     * @param beta Array of beta parameters for each cluster.
+     * @param ell Array of distances for each cluster.
+     * @param K Number of clusters.
+     * @return A double array representing the new centroid vector.
+     */
     public static double[] computeVectorX(double fixedA, double fixedB, double[] alpha, double[] beta, double[] ell, int K) {
-        double gamma = 0.5;
-        double[] xDist = new double[K];
-        double fA, fB;
-        double power = 0.5;
-        int T = 10;
+
+        double gamma = 0.5; // Initial gamma value, balances fA and fB
+        double[] xDist = new double[K]; // Output array of centroids
+        double fA, fB; // Cost functions
+        double power = 0.5; // Step size adjustment
+        int T = 10;  // Maximum number of iterations
+
+        /**
+         * Adjust the gamma to obtain a balancing between fA and fB
+         */
         for (int t=1; t<=T; t++){
+
             fA = fixedA;
             fB = fixedB;
-            power = power/2;
+            power = power/2; // Reduce step size over time
+
             for (int i=0; i<K; i++) {
+                // Compute current estimate for xDist[i] based on gamma
                 double temp = (1-gamma)*beta[i]*ell[i]/(gamma*alpha[i]+(1-gamma)*beta[i]);
                 xDist[i]=temp;
+
+                // Update cost functions fA and fB based on the new temp value
                 fA += alpha[i]*temp*temp;
                 temp=(ell[i]-temp);
                 fB += beta[i]*temp*temp;
             }
-            if (fA == fB) {break;}
+            // If costs are equal, exit because the two value are balanced
+            if (fA == fB) {
+                break;
+            }
+            // Adjust gamma based on which cost is higher
             gamma = (fA > fB) ? gamma+power : gamma-power;
         }
         return xDist;
@@ -255,23 +287,36 @@ public class G01HW2 {
     }
 
 
-    //Method implements by us to find the centroids
+    /**
+     * Performs a fairness-aware clustering using a modified version of Lloyd's algorithm (K-Means),
+     * where centroids are adjusted to account for fairness between two demographic groups ('A' and 'B').
+     *
+     * The algorithm follows these steps:
+     * 1. Initialize K centroids using a variant of Lloyd's algorithm without fairness constraints.
+     * 2. For M iterations:
+     *    a. Assign each point to its closest centroid.
+     *    b. For each cluster, compute separate centroids for groups A and B.
+     *    c. Use a fairness-aware update to compute new centroids, balancing intra-group distances.
+     * 3. Return the list of final centroids.
+     *
+     * @param all_points RDD of (Vector, Character) pairs, where Vector is a data point and Character is its group label ('A' or 'B').
+     * @param K Number of clusters.
+     * @param M Number of iterations
+     * @return A list of K centroids.
+     */
     public static List<Vector> MRFairLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
-        // Step 1: initialize K centroids with K-Means (Spark)
-        // Step 2: repeat M times:
-        //         a. assign each point to the closest centroid
-        //         b. compute a new fair centroid for each cluster
-        // Step 3: return the final list of centroids
 
+        // Step 1: Initialize K centroids with standard Lloyd's algorithm (no fairness)
         List<Vector> centroidList = MRLloyd(all_points,K,0);
 
         for (int iter = 0; iter < M; iter++) {
-            //Broadcasting vector between all the tasks for efficiency
+
+            // Broadcasting vector between all the tasks for efficiency
             Broadcast<Vector[]> broadcastCentroids = JavaSparkContext.fromSparkContext(all_points.context())
                     .broadcast(centroidList.toArray(new Vector[0]));
 
-            // Assign every point to the closest centroid
+            // Step 2a: Assign each point to the closest centroid
             JavaPairRDD<Integer, Tuple2<Vector, Character>> clusteredPoints = all_points.mapToPair(point -> {
                 Vector vec = point._1;
                 Character group = point._2;
@@ -279,22 +324,23 @@ public class G01HW2 {
                 return new Tuple2<>(closest, new Tuple2<>(vec, group));
             });
 
-            // Group by cluster
+            // Group all points by their assigned cluster
             JavaPairRDD<Integer, Iterable<Tuple2<Vector, Character>>> groupedByCluster = clusteredPoints.groupByKey();
 
-            // Count global totals for A and B (computed once outside the loop)
+            // Compute total count of points in groups A and B
             long totalA = all_points.filter(p -> p._2 == 'A').count();
             long totalB = all_points.filter(p -> p._2 == 'B').count();
 
-            // Initializing vectors
+            // Arrays to store intermediate statistics for each cluster
             double[] alpha = new double[K];
             double[] beta = new double[K];
             double[] l = new double[K];
-            Vector[] muA = new Vector[K];
-            Vector[] muB = new Vector[K];
+            Vector[] muA = new Vector[K]; // Centroids for group A per cluster
+            Vector[] muB = new Vector[K]; // Centroids for group B per cluster
 
             Map<Integer, Iterable<Tuple2<Vector, Character>>> clusterMap = groupedByCluster.collectAsMap();
 
+            // Step 2b: Compute group-specific centroids and weights
             for (int i = 0; i < K; i++) {
                 Iterable<Tuple2<Vector, Character>> points = clusterMap.get(i);
                 List<Vector> groupA = new ArrayList<>();
@@ -307,43 +353,51 @@ public class G01HW2 {
                         groupB.add(entry._1);
                 }
 
+                // Compute centroids for each group in the cluster
                 muA[i] = computeCentroid(groupA);
                 muB[i] = computeCentroid(groupB);
 
+                // Normalize sizes with respect to total group sizes
                 alpha[i] = (double) groupA.size() / totalA;
                 beta[i] = (double) groupB.size() / totalB;
+
+                // Distance between group centroids
                 l[i] = Math.sqrt(Vectors.sqdist(muA[i], muB[i]));
             }
 
-            // Computing fixedA
+            // Step 2c: Compute fixed terms for fairness-aware optimization
+
+            // Compute average squared distance of group A points to their muA
             double deltaA = all_points.filter(p -> p._2 == 'A').mapToDouble(p -> {
                 int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
-                return squaredDistance(p._1, muA[cluster]);
+                return Vectors.sqdist(p._1, muA[cluster]);
             }).reduce(Double::sum);
 
-            // Computing fixedB
+            // Compute average squared distance of group B points to their muB
             double deltaB = all_points.filter(p -> p._2 == 'B').mapToDouble(p -> {
                 int cluster = findClosestCentroid(p._1, broadcastCentroids.value());
-                return squaredDistance(p._1, muB[cluster]);
+                return Vectors.sqdist(p._1, muB[cluster]);
             }).reduce(Double::sum);
 
             double fixedA = deltaA / totalA;
             double fixedB = deltaB / totalB;
 
-            // Compute x using the given function
+            // Compute fair weights using iterative optimizer
             double[] x = computeVectorX(fixedA, fixedB, alpha, beta, l, K);
 
-            // Compute new fair centroids
+            // Step 2d: Compute new fair centroids based on x values and weighted combination of muA and muB
             List<Vector> newCentroids = new ArrayList<>();
             for (int i = 0; i < K; i++) {
+                // Combine muA and muB with weights derived from x
                 Vector ci = combineVectors(muA[i], muB[i], (l[i] - x[i]) / l[i], x[i] / l[i]);
                 newCentroids.add(ci);
             }
 
+            // Update centroids for next iteration
             centroidList = newCentroids;
         }
 
-
+        // Step 3: Return the final list of fair centroids
         return centroidList;
     }
 
@@ -429,7 +483,6 @@ public class G01HW2 {
         double fairObjectiveB = totalB / NB;
 
         // Return the maximum of the two group costs (phi value)
-
         return Math.max(fairObjectiveA, fairObjectiveB);
 
 
@@ -524,44 +577,81 @@ public class G01HW2 {
         }
 
     }
+
+    /**
+     * Computes the centroid (mean vector) of a list of vectors.
+     *
+     * The centroid is calculated by averaging each component across all vectors
+     * in the input list. If the input list is empty, the method returns a zero-length vector.
+     *
+     *
+     * @param vectors A list of instances representing the data points for which the centroid is to be computed.
+     *                All vectors are assumed to have the same dimensionality.
+     *
+     * @return A vector representing the centroid of the input vectors.
+     *          If the input list is empty, a zero-dimensional vector is returned.
+     */
     public static Vector computeCentroid(List<Vector> vectors) {
 
-        if (vectors.isEmpty()) return Vectors.zeros(0);
+        // If the list is empty, return an empty (0-dimensional) vector
+        if (vectors.isEmpty())
+            return Vectors.zeros(0);
 
+        // Get dimensionality from the first vector
         int dim = vectors.get(0).size();
         double[] sum = new double[dim];
 
+        // Sum each component of the vectors
         for (Vector vec : vectors) {
             for (int i = 0; i < dim; i++) {
                 sum[i] += vec.apply(i);
             }
         }
 
+        // Divide each component by the number of vectors to get the mean
         for (int i = 0; i < dim; i++) {
             sum[i] /= vectors.size();
         }
 
+        // Return the mean as a dense vector
         return Vectors.dense(sum);
     }
 
-    public static double squaredDistance(Vector v1, Vector v2) {
-        int dim = v1.size();
-        double sum = 0.0;
-        for (int i = 0; i < dim; i++) {
-        double diff = v1.apply(i) - v2.apply(i);
-        sum += diff * diff;
-        }
-        return sum;
-        }
-
+        /**
+        * Combines two vectors by computing a weighted sum of their components.
+        *
+        * Each element of the resulting vector is computed as:
+        *     result[i] = weight1 * v1[i] + weight2 * v2[i]
+        *
+        * @param v1 the first input vector
+        * @param v2 the second input vector
+        * @param weight1 the weight applied to the first vector
+        * @param weight2 the weight applied to the second vector
+        * @return a new vector representing the weighted sum of v1 and v2
+        * @throws IllegalArgumentException if the input vectors have different dimensions
+        */
         public static Vector combineVectors(Vector v1, Vector v2, double weight1, double weight2) {
-        int dim = v1.size();
-        double[] result = new double[dim];
-        for (int i = 0; i < dim; i++) {
-            result[i] = weight1 * v1.apply(i) + weight2 * v2.apply(i);
+
+            // Get the dimension of the first vector
+            int dim = v1.size();
+
+            // Check if both vectors have the same dimension, else throw an exception
+            if (v2.size() != dim) {
+                throw new IllegalArgumentException("Vectors must have the same dimension.");
+            }
+
+            // Array to store the weighted sum components
+            double[] result = new double[dim];
+
+            // Iterate over each component of the vectors
+            for (int i = 0; i < dim; i++) {
+                // Compute weighted sum for the i-th component
+                result[i] = weight1 * v1.apply(i) + weight2 * v2.apply(i);
+            }
+
+            // Return the combined vector as a dense vector
+            return Vectors.dense(result);
         }
-        return Vectors.dense(result);
-    }
 }
 
 
