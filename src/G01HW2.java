@@ -13,27 +13,7 @@ import java.util.*;
 import java.io.IOException;
 
 
-/**
- *
- * This program performs clustering on a 2D dataset using the KMeans algorithm implemented in Apache Spark.
- * In addition to the standard k-means objective function, it computes a fairness-aware clustering metric
- * that accounts for demographic parity between two groups labeled 'A' and 'B'.
- * /
- * The input consists of 2D points with a demographic label. The algorithm processes this input,
- * clusters the data into K groups using L partitions over M iterations, and computes:
- * - The standard k-means cost (Delta) --> function MRComputeStandardObjective
- * - The fairness k-means cost (Phi) --> function MRComputeFairObjective
- * - Statistics of group distribution across clusters --> function MRPrintStatistics
- * /
- * Input Format (CSV): x, y, label (where label is either 'A' or 'B')
- * /
- * Dependencies: Apache Spark, Spark MLlib
- * /
- * Authors:
- * - Faedo Giovanni - Student ID: 2149759
- * - Prioli Giacomo - Student ID: 2166293
- * - Francescato Daniele - Student ID: 2160563
- */
+
 
 
 public class G01HW2 {
@@ -560,7 +540,7 @@ public class G01HW2 {
             int countA = entry._2._1;
             int countB = entry._2._2;
 
-            //new code added to correct feedback from hw1
+            // CORRECTION from HW1 - points with N-dimensions
             Vector center = centroids[centroidId];
             StringBuilder coords = new StringBuilder();
             coords.append("(");
