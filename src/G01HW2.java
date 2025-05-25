@@ -12,14 +12,34 @@ import java.util.*;
 
 import java.io.IOException;
 
-
-
-
+/**
+ *
+ * This program performs fair k-means clustering using a variant of Lloyd’s algorithm,
+ * as proposed in the paper "Socially Fair k-Means Clustering" (ACM FAccT'21). In addition
+ * to the standard k-means cost, it computes a fairness-aware objective that balances error
+ * across two demographic groups labeled 'A' and 'B'.
+ *
+ * The input consists of points with demographic labels. The algorithm reads this input,
+ * clusters the points into K groups using L partitions over M iterations, and computes:
+ * - Standard k-means centroids and cost (Φ_standard) --> via Spark's KMeans implementation
+ * - Fair centroids and cost (Φ_fair) --> function MRFairLloyd
+ * - The fairness-aware cost function Φ(A,B,C) --> function MRComputeFairObjective
+ *
+ * Input Format (CSV): x, y, label (where label is either 'A' or 'B')
+ *
+ * Dependencies: Apache Spark, Spark MLlib
+ *
+ * Authors:
+ * - Faedo Giovanni - Student ID: 2149759
+ * - Prioli Giacomo - Student ID: 2166293
+ * - Francescato Daniele - Student ID: 2160563
+ */
 
 public class G01HW2 {
 
     /**
-     * Represents statistical parameters for a cluster
+     * Inner class representing statistical parameters for a cluster.
+     * It stores the alpha and beta parameters, mean vectors for groups A and B, and a scalar l.
      */
     public class ClusterStats {
         // Alpha parameter
@@ -251,7 +271,7 @@ public class G01HW2 {
         return xDist;
     }
 
-    //Default method offered by Spark to compute the centroids with K clusters and M iterations
+    // Default method offered by Spark to compute the centroids with K clusters and M iterations
 
     public static List<Vector> MRLloyd(JavaPairRDD<Vector, Character> all_points, int K, int M)
     {
@@ -341,8 +361,19 @@ public class G01HW2 {
                 alpha[i] = (double) groupA.size() / totalA;
                 beta[i] = (double) groupB.size() / totalB;
 
-                // Distance between group centroids
+                if(alpha[i] == 0){
+                    // we force muA = muB
+                    muA[i] = muB[i];
+                    l[i] = 0;
+                }
+                else if(beta[i] == 0){
+                    // we force muB = muA
+                    muB[i] = muA[i];
+                    l[i] = 0;
+                }
+
                 l[i] = Math.sqrt(Vectors.sqdist(muA[i], muB[i]));
+
             }
 
             // Step 2c: Compute fixed terms for fairness-aware optimization
