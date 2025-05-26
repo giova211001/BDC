@@ -21,8 +21,8 @@ public class G01GEN {
 
         int N = Integer.parseInt(args[0]);  // Total number of points
         int K = Integer.parseInt(args[1]);  // Number of desired clusters
-        // Balanced distribution of the points
 
+        // Balanced distribution of the points
         int pointsPerCluster = N / (2 * K); // Half for each group, evenly spread across K clusters
         int generated = 0;
         Random rand = new Random(42); // Fixed seed for reproducibility -> same sequencies of random numbers
