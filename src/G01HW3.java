@@ -7,14 +7,30 @@ import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
+
+/**
+ * G01HW3 is a Spark Streaming application that estimates the frequencies
+ * of items in a data stream using Count-Min Sketch and Count Sketch.
+ * It compares the estimated frequencies with actual frequencies of the
+ * top-K most frequent items and reports the average relative error.
+ */
 public class G01HW3 {
 
 
+    /**
+     * Count-Min Sketch (CMS) data structure for frequency estimation in data streams.
+     */
     public static class Countminsketch {
         public int[][] CM;
         public final int D, W;
         public final HashFunction[] hf;
 
+        /**
+         * Initializes a Count-Min Sketch with given dimensions and hash functions.
+         * @param depth Number of rows (hash functions)
+         * @param width Number of columns per row
+         * @param h Array of hash functions
+         */
         public Countminsketch(int depth, int width, HashFunction[] h) {
             D = depth;
             W = width;
@@ -22,6 +38,11 @@ public class G01HW3 {
             CM = new int[D][W];
         }
 
+
+        /**
+         * Adds a single element to the sketch.
+         * @param x Element to add
+         */
         public void add(int x)
         {
             int cindex;
@@ -30,6 +51,12 @@ public class G01HW3 {
                 CM[i][cindex]++;
             }
         }
+
+        /**
+         * Adds an element with a specified frequency to the sketch.
+         * @param x Element to add
+         * @param f Frequency of the element
+         */
         public void add_f(int x, int f)
         {
             int cindex;
@@ -40,6 +67,11 @@ public class G01HW3 {
             }
         }
 
+        /**
+         * Estimates the frequency of the given element.
+         * @param x Element to estimate
+         * @return Estimated frequency
+         */
         public int estimate(int x) {
             int cindex = hf[0].hash(x);
             int freq = CM[0][cindex];
@@ -52,71 +84,135 @@ public class G01HW3 {
     }
 
 
-        public static class Countsketch
+    /**
+     * Count Sketch (CS) data structure for frequency estimation in data streams.
+     */
+    public static class Countsketch
+    {
+        public int[][] CS;
+        public final int D, W;
+        public final HashFunction[] hf;
+        public final HashFunction[] shf;
+
+
+        /**
+         * Initializes a Count Sketch with given dimensions and hash/sign functions.
+         * @param depth Number of rows (hash functions)
+         * @param width Number of columns per row
+         * @param h Array of hash functions
+         * @param sh Array of sign functions
+         */
+        public Countsketch(int depth, int width, HashFunction[] h, HashFunction[] sh)
         {
-            public int[][] CS;
-            public final int D, W;
-            public final HashFunction[] hf;
-            public final HashFunction[] shf;
+            D = depth;
+            W = width;
+            hf = h;
+            shf = sh;
+            CS = new int[D][W];
+        }
 
-            public Countsketch(int depth, int width, HashFunction[] h, HashFunction[] sh)
+        /**
+         * Adds a single element to the sketch.
+         * @param x Element to add
+         */
+        public void add(int x)
+        {
+            int cindex, sgn;
+            for(int i = 0; i < D; i++)
             {
-                D = depth;
-                W = width;
-                hf = h;
-                shf = sh;
-                CS = new int[D][W];
+                cindex = hf[i].hash(x);
+                sgn = shf[i].sign(x);
+
+                CS[i][cindex] += sgn;
             }
-            public void add(int x)
+        }
+
+        /**
+         * Adds an element with a specified frequency to the sketch.
+         * @param x Element to add
+         * @param f Frequency of the element
+         */
+        public void add_f(int x, int f)
+        {
+            int cindex, sgn;
+            for(int i = 0; i < D; i++)
             {
-                int cindex, sgn;
-                for(int i = 0; i < D; i++)
-                {
-                    cindex = hf[i].hash(x);
-                    sgn = shf[i].sign(x);
+                cindex = hf[i].hash(x);
+                sgn = shf[i].sign(x);
 
-                    CS[i][cindex] += sgn;
-                }
+                CS[i][cindex] += sgn * f;
             }
+        }
 
-            public void add_f(int x, int f)
-            {
-                int cindex, sgn;
-                for(int i = 0; i < D; i++)
-                {
-                    cindex = hf[i].hash(x);
-                    sgn = shf[i].sign(x);
 
-                    CS[i][cindex] += sgn * f;
-                }
+        /**
+         * Estimates the frequency of the given element using median of signed counts.
+         * @param x Element to estimate
+         * @return Estimated frequency
+         */
+        public int estimate(int x)
+        {
+            int[] estimates = new int[D];
+            int cindex, sign;
+            for (int i = 0; i < D; i++) {
+                cindex = hf[i].hash(x);
+                sign = shf[i].sign(x);
+                estimates[i] = CS[i][cindex] * sign;
             }
-
-            public int estimate(int x)
-            {
-                int[] estimates = new int[D];
-                int cindex, sign;
-                for (int i = 0; i < D; i++) {
-                    cindex = hf[i].hash(x);
-                    sign = shf[i].sign(x);
-                    estimates[i] = CS[i][cindex] * sign;
-                }
-                Arrays.sort(estimates);
-                if(D % 2 == 0) return (estimates[D/2 - 1] + estimates[D/2])/2;
-                return estimates[D/2]; // mediana
-            }
+            Arrays.sort(estimates);
+            if(D % 2 == 0) return (estimates[D/2 - 1] + estimates[D/2])/2;
+            return estimates[D/2]; // mediana
+        }
     }
+
+    /**
+     * Represents a family of hash function
+     */
     public static class HashFunction
     {
         public int a, b, p = 8191, C;
-        public HashFunction(int C, Random rnd){
+
+        /**
+         * Initializes a universal hash function with random coefficients.
+         * @param C Output range of the hash function
+         * @param rnd Random number generator
+         */
+        public HashFunction(int C, Random rnd)
+        {
             this.a = rnd.nextInt(p-1) + 1; // from 1 to p-1
             this.b = rnd.nextInt(p); // from 0 to p-1
             this.C = C;
         }
+
+        /**
+         * Computes the hash value for the given input.
+         * @param x Input value
+         * @return Hash value in range [0, C)
+         */
         public int hash(int x){return Math.floorMod((a * x + b) % p, C);}
+
+        /**
+         * Computes signed hash function
+         * @param x Input value
+         * @return Sign (+1 or -1)
+         */
         public int sign(int x){return ((a * x + b) % p) % 2 == 0 ? 1 : -1;}
     }
 
+
+    /**
+     * Main method of the Spark Streaming application.
+     * It receives integers from a socket stream, maintains frequency estimation using
+     * Count-Min Sketch and Count Sketch, and evaluates their accuracy against true frequencies.
+     *
+     * @param args Command-line arguments:
+     *             - portExp: Port number to connect to socket
+     *             - T: Number of items to process from the stream
+     *             - D: Number of rows (depth) in the sketches
+     *             - W: Number of columns (width) in the sketches
+     *             - K: Number of top frequent items (heavy hitters) to track
+     * @throws InterruptedException if interrupted while waiting on semaphore
+     */
     public static void main(String[] args) throws InterruptedException {
 
         // Lettura parametri da terminale
@@ -170,7 +266,6 @@ public class G01HW3 {
 
 
         Map<Integer, Integer> mymap = new HashMap<>();
-        Map<Integer, Integer> histogram = new HashMap<>();
         // Connection to the stream
         sc.socketTextStream("algo.dei.unipd.it", portExp, StorageLevels.MEMORY_AND_DISK)
                 .foreachRDD((batch, time) -> {
@@ -190,7 +285,6 @@ public class G01HW3 {
                             cms.add_f(element, freq);
                             cs.add_f(element, freq);
                             mymap.compute(entry.getKey(), (k, v) -> v == null ? entry.getValue() : v + entry.getValue());
-                            if (!histogram.containsKey(element)) histogram.put(element, 1);
                         }
                         if (streamLength[0] >= T) stopping.release();
                     }
@@ -204,11 +298,17 @@ public class G01HW3 {
         sc.awaitTermination();
 
         System.out.println("Number of processed items = " + streamLength[0]);
-        System.out.println("Number of distinct items = " + histogram.size());
-        List<Map.Entry<Integer, Integer>> top_k = mymap.entrySet()
-                .stream()
-                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue())).limit(K)
+        System.out.println("Number of distinct items = " + mymap.size());
+
+        List<Integer> freqSorted = mymap.values().stream()
+                .sorted(Comparator.reverseOrder())
                 .collect(Collectors.toList());
+        int phiK = freqSorted.get(K - 1);
+
+        List<Map.Entry<Integer, Integer>> top_k = mymap.entrySet().stream()
+                .filter(e -> e.getValue() >= phiK)
+                .collect(Collectors.toList());
+
 
         System.out.println("Number of Top-K Heavy Hitters = " + top_k.size());
 
