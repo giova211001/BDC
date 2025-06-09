@@ -242,31 +242,26 @@ public class G01HW3 {
         int K = Integer.parseInt(args[4]);
         System.out.println("Number of top frequent items of interest = " + K);
 
-
-
-        // STRUTTURE DATI PER CM E CS + HASH FUNCTION
-
-
-
+        // hash functions generation
         HashFunction[] CM_hash = new HashFunction[D];
         HashFunction[] CS_hash = new HashFunction[D];
         HashFunction[] CS_hash_sgn = new HashFunction[D];
-
         Random r = new Random();
         for(int i = 0; i < D; i++){
-            CM_hash[i] = new HashFunction(W, r);
-            CS_hash[i] = new HashFunction(W, r);
-            CS_hash_sgn[i] = new HashFunction(W, r);
+            CM_hash[i] = new HashFunction(W, r); // hash function for count-min sketch
+            CS_hash[i] = new HashFunction(W, r);  // hash function for count sketch
+            CS_hash_sgn[i] = new HashFunction(W, r);  // signed hash function for count sketch
         }
+
+        // data structure definition for countminsketch and countsketch
 
         Countminsketch cms = new Countminsketch(D, W, CM_hash);
         Countsketch cs = new Countsketch(D, W, CS_hash, CS_hash_sgn);
-        // STATO GLOBALE DELL'ELABORAZIONE
+
         long[] streamLength = new long[1];
 
-
         Map<Integer, Integer> mymap = new HashMap<>();
-        // Connection to the stream
+        // connection to the stream
         sc.socketTextStream("algo.dei.unipd.it", portExp, StorageLevels.MEMORY_AND_DISK)
                 .foreachRDD((batch, time) -> {
                     if(streamLength[0] < T)
@@ -282,8 +277,8 @@ public class G01HW3 {
                         {
                             element = entry.getKey();
                             freq = entry.getValue();
-                            cms.add_f(element, freq);
-                            cs.add_f(element, freq);
+                            cms.add_f(element, freq);    // count-min sketch structure update
+                            cs.add_f(element, freq);     // count sketch structure update
                             mymap.compute(entry.getKey(), (k, v) -> v == null ? entry.getValue() : v + entry.getValue());
                         }
                         if (streamLength[0] >= T) stopping.release();
@@ -314,6 +309,8 @@ public class G01HW3 {
 
         int  item;
         double true_freq, est_freq_CM, est_freq_CS, rel_err_CM, rel_err_CS, avg_rel_err_CM = 0, avg_rel_err_CS = 0;
+
+        // error estimation
         for (Map.Entry<Integer, Integer> entry : top_k)
         {
             item = entry.getKey();
@@ -327,9 +324,11 @@ public class G01HW3 {
         }
         avg_rel_err_CM = avg_rel_err_CM / top_k.size();
         avg_rel_err_CS = avg_rel_err_CS/ top_k.size();
+
         System.out.println("Avg Relative Error for TOP-K Heavy Hitters with CM = " + avg_rel_err_CM);
         System.out.println("Avg Relative Error for TOP-K Heavy Hitters with CS = " + avg_rel_err_CS);
 
+        // printf top-k heavy hitters
         if(K <= 10)
         {
             top_k.sort(Map.Entry.comparingByKey());
