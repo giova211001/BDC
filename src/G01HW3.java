@@ -1,20 +1,14 @@
-import cats.kernel.Hash;
-import org.apache.hadoop.fs.shell.Count;
-import org.apache.hadoop.yarn.webapp.example.MyApp;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.StorageLevels;
-import org.apache.spark.streaming.Duration;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
-import scala.Int;
 import scala.Tuple2;
-
 import java.util.*;
-
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 public class G01HW3 {
+
 
     public static class Countminsketch {
         public int[][] CM;
@@ -54,18 +48,6 @@ public class G01HW3 {
                 if (CM[i][cindex] < freq) freq = CM[i][cindex];
             }
             return freq;
-        }
-
-        public void merge(Countminsketch cms) {
-            if (D != cms.D || W != cms.W) throw new IllegalArgumentException("CMS dimension mismatch");
-            for (int i = 0; i < D; i++) {
-                if (!hf[i].compare(cms.hf[i])) throw new IllegalArgumentException("CMS hash mismatch");
-            }
-
-            for (int i = 0; i < D; i++) {
-                for (int j = 0; j < W; j++) CM[i][j] += cms.CM[i][j];
-            }
-
         }
     }
 
@@ -122,20 +104,6 @@ public class G01HW3 {
                 if(D % 2 == 0) return (estimates[D/2 - 1] + estimates[D/2])/2;
                 return estimates[D/2]; // mediana
             }
-
-            public void merge(Countsketch cms)
-            {
-                if(D !=  cms.D || W != cms.W) throw new IllegalArgumentException("CMS dimension mismatch");
-                for(int i = 0; i < D; i++)
-                {
-                    if(!hf[i].compare(cms.hf[i]) || (!shf[i].compare(cms.shf[i]))) throw new IllegalArgumentException("CMS hash mismatch");
-                }
-
-                for (int i = 0; i < D; i++)
-                {
-                    for (int j = 0; j < W; j++) CS[i][j] += cms.CS[i][j];
-                }
-            }
     }
     public static class HashFunction
     {
@@ -147,7 +115,6 @@ public class G01HW3 {
         }
         public int hash(int x){return Math.floorMod((a * x + b) % p, C);}
         public int sign(int x){return ((a * x + b) % p) % 2 == 0 ? 1 : -1;}
-        public boolean compare(HashFunction h) {return (a == h.a && b == h.b && C == h.C);}
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -200,7 +167,6 @@ public class G01HW3 {
         Countsketch cs = new Countsketch(D, W, CS_hash, CS_hash_sgn);
         // STATO GLOBALE DELL'ELABORAZIONE
         long[] streamLength = new long[1];
-        streamLength[0] = 0L;
 
 
         Map<Integer, Integer> mymap = new HashMap<>();
@@ -266,7 +232,7 @@ public class G01HW3 {
 
         if(K <= 10)
         {
-            top_k.sort(Comparator.comparing(Map.Entry::getKey));
+            top_k.sort(Map.Entry.comparingByKey());
             for (Map.Entry<Integer, Integer> entry : top_k)
             {
                 item = entry.getKey();
