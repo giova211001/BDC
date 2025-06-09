@@ -97,13 +97,25 @@ public class G01HW3 {
                 }
             }
 
+            public void add_f(int x, int f)
+            {
+                int cindex, sgn;
+                for(int i = 0; i < D; i++)
+                {
+                    cindex = hf[i].hash(x);
+                    sgn = shf[i].sign(x);
+
+                    CS[i][cindex] += sgn * f;
+                }
+            }
+
             public int estimate(int x)
             {
                 int[] estimates = new int[D];
                 int cindex, sign;
                 for (int i = 0; i < D; i++) {
                     cindex = hf[i].hash(x);
-                    sign = shf[i].hash(x);
+                    sign = shf[i].sign(x);
                     estimates[i] = CS[i][cindex] * sign;
                 }
                 Arrays.sort(estimates);
@@ -185,7 +197,7 @@ public class G01HW3 {
         }
 
         Countminsketch cms = new Countminsketch(D, W, CM_hash);
-
+        Countsketch cs = new Countsketch(D, W, CS_hash, CS_hash_sgn);
         // STATO GLOBALE DELL'ELABORAZIONE
         long[] streamLength = new long[1];
         streamLength[0] = 0L;
@@ -204,11 +216,15 @@ public class G01HW3 {
                                 .reduceByKey((i1, i2) -> i1 + i2)
                                 .collectAsMap();
 
+                        int element, freq;
                         for (Map.Entry<Integer, Integer> entry : items.entrySet())
                         {
-                            cms.add_f(entry.getKey(), entry.getValue());
+                            element = entry.getKey();
+                            freq = entry.getValue();
+                            cms.add_f(element, freq);
+                            cs.add_f(element, freq);
                             mymap.compute(entry.getKey(), (k, v) -> v == null ? entry.getValue() : v + entry.getValue());
-                            if (!histogram.containsKey(entry.getKey())) histogram.put(entry.getKey(), 1);
+                            if (!histogram.containsKey(element)) histogram.put(element, 1);
                         }
                         if (streamLength[0] >= T) stopping.release();
                     }
@@ -218,29 +234,35 @@ public class G01HW3 {
         sc.start();
         stopping.acquire();
 
-                sc.stop(false, false);
+        sc.stop(false, false);
         sc.awaitTermination();
 
-        System.out.println("Number of items processed = " + streamLength[0]);
+        System.out.println("Number of processed items = " + streamLength[0]);
         System.out.println("Number of distinct items = " + histogram.size());
         List<Map.Entry<Integer, Integer>> top_k = mymap.entrySet()
                 .stream()
                 .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue())).limit(K)
                 .collect(Collectors.toList());
 
+        System.out.println("Number of Top-K Heavy Hitters = " + top_k.size());
 
         int  item;
-        double true_freq, est_freq, rel_err_CM, avg_rel_err_CM = 0;
+        double true_freq, est_freq_CM, est_freq_CS, rel_err_CM, rel_err_CS, avg_rel_err_CM = 0, avg_rel_err_CS = 0;
         for (Map.Entry<Integer, Integer> entry : top_k)
         {
             item = entry.getKey();
             true_freq = entry.getValue();
-            est_freq = cms.estimate(entry.getKey());
-            rel_err_CM = (est_freq - true_freq) / true_freq;
+            est_freq_CM = cms.estimate(item);
+            est_freq_CS = cs.estimate(item);
+            rel_err_CM = (est_freq_CM - true_freq) / true_freq;
+            rel_err_CS = Math.abs(est_freq_CS - true_freq) / true_freq;
             avg_rel_err_CM += rel_err_CM;
+            avg_rel_err_CS += rel_err_CS;
         }
-        avg_rel_err_CM = avg_rel_err_CM / K;
+        avg_rel_err_CM = avg_rel_err_CM / top_k.size();
+        avg_rel_err_CS = avg_rel_err_CS/ top_k.size();
         System.out.println("Avg Relative Error for TOP-K Heavy Hitters with CM = " + avg_rel_err_CM);
+        System.out.println("Avg Relative Error for TOP-K Heavy Hitters with CS = " + avg_rel_err_CS);
 
         if(K <= 10)
         {
@@ -249,9 +271,9 @@ public class G01HW3 {
             {
                 item = entry.getKey();
                 true_freq = entry.getValue();
-                est_freq = cms.estimate(entry.getKey());
+                est_freq_CM = cms.estimate(entry.getKey());
 
-                System.out.println("Item " + item + " True Frequency = " + true_freq + " Estimated Frequency with CM = " + est_freq);
+                System.out.println("Item " + item + " True Frequency = " + (int)true_freq + " Estimated Frequency with CM = " + (int)est_freq_CM);
             }
         }
 
